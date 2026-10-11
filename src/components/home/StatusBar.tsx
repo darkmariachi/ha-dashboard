@@ -3,6 +3,7 @@ import {
   DoorOpen,
   Flame,
   Music,
+  Power,
   Snowflake,
   Sparkles,
   Sun,
@@ -26,6 +27,7 @@ import { roomColorFor } from "../../lib/roomPalette";
 import { useNow } from "../../lib/useNow";
 import { ClimateControlModal } from "../climate/ClimateControlModal";
 import { DoorsModal } from "./DoorsModal";
+import { OnNowModal, useOnNow } from "./OnNowModal";
 import { PowerModal } from "./PowerModal";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { QuickActionToast } from "./QuickActionToast";
@@ -37,6 +39,7 @@ import { useSpotifyNowPlaying } from "./useSpotifyNowPlaying";
 const DOORS_COLOR = roomColorFor(1);
 const DOOR_OPEN_COLOR: RoomColor = { tint: "#ffe2c2", accent: "#d9822b" };
 const SOLAR_GREEN = "#2f9e6f";
+const ON_NOW_COLOR = roomColorFor(0);
 const POWER_COLOR = roomColorFor(4);
 const CLIMATE_COLOR = roomColorFor(5);
 const ACTIONS_COLOR = roomColorFor(2);
@@ -317,11 +320,49 @@ function DoorsTile({ className, onOpen }: { className?: string; onOpen: () => vo
   );
 }
 
+/** What's on around the house, and a way to turn it off — for checking from
+ * the phone after leaving. Glows amber when things are on with nobody home. */
+function OnNowTile({ className, onOpen }: { className?: string; onOpen: () => void }) {
+  const { items, indoor, away } = useOnNow();
+  const leftOn = away && indoor.length > 0;
+  const byRoom = new Map<string, number>();
+  for (const item of items) byRoom.set(item.room, (byRoom.get(item.room) ?? 0) + 1);
+
+  return (
+    <button
+      onClick={items.length > 0 ? onOpen : undefined}
+      className={clsx(tileClass, items.length > 0 && "cursor-pointer transition-transform active:scale-[0.98]", className)}
+      style={{
+        animationDelay: "110ms",
+        ...(leftOn && {
+          borderColor: `${DOOR_OPEN_COLOR.accent}8c`,
+          boxShadow: `var(--glass-shadow), 0 0 0 1px ${DOOR_OPEN_COLOR.accent}4d, 0 0 34px -6px ${DOOR_OPEN_COLOR.accent}8c`,
+        }),
+      }}
+    >
+      <TileHeader icon={Power} label="On right now" color={leftOn ? DOOR_OPEN_COLOR : ON_NOW_COLOR} />
+      <div
+        className="text-[28px] font-light leading-tight tracking-[-0.8px] text-text"
+        style={leftOn ? { color: DOOR_OPEN_COLOR.accent, fontWeight: 500 } : undefined}
+      >
+        {items.length === 0 ? "Everything's off" : `${items.length} ${items.length === 1 ? "thing" : "things"} on`}
+      </div>
+      {items.length > 0 && (
+        <div className="mt-auto truncate text-[13px] text-text-dim">
+          {leftOn && "Nobody's home · "}
+          {[...byRoom].map(([room, n]) => `${room} ${n}`).join(" · ")}
+        </div>
+      )}
+    </button>
+  );
+}
+
 export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone" }) {
   const { entities, callService } = useHa();
   const [climateOpen, setClimateOpen] = useState(false);
   const [powerOpen, setPowerOpen] = useState(false);
   const [doorsOpen, setDoorsOpen] = useState(false);
+  const [onNowOpen, setOnNowOpen] = useState(false);
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [toastAction, setToastAction] = useState<QuickAction | null>(null);
   // Bumped on every tap so re-tapping the same action while its toast is
@@ -352,6 +393,7 @@ export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone"
         // tiles side by side, then doors and music full width.
         <>
           <QuickActionsTile onRun={runAction} className="col-span-2 min-h-0" />
+          <OnNowTile className="col-span-2 min-h-0" onOpen={() => setOnNowOpen(true)} />
           <PowerTile onOpen={() => setPowerOpen(true)} />
           <ClimateTile onOpen={() => setClimateOpen(true)} />
           <DoorsTile className="col-span-2 min-h-0" onOpen={() => setDoorsOpen(true)} />
@@ -377,6 +419,7 @@ export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone"
       {spotifyOpen && <SpotifySearchModal onClose={() => setSpotifyOpen(false)} />}
       {powerOpen && <PowerModal onClose={() => setPowerOpen(false)} />}
       {doorsOpen && <DoorsModal onClose={() => setDoorsOpen(false)} />}
+      {onNowOpen && <OnNowModal onClose={() => setOnNowOpen(false)} />}
 
       {toastAction && (
         <QuickActionToast

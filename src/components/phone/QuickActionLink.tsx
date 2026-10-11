@@ -3,10 +3,8 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CURATED_QUICK_ACTIONS } from "../../config/curatedHome";
 import { useHa } from "../../ha/HaProvider";
+import { ON_STATES } from "../../lib/entityHelpers";
 import { Sheet } from "../home/Sheet";
-
-/** States that mean "this is on" across lights, switches, fans and TVs. */
-const ON_STATES = new Set(["on", "playing", "paused", "idle", "buffering"]);
 
 /**
  * Opens a confirm sheet for a quick action named in the URL

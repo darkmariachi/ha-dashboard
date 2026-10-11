@@ -269,6 +269,14 @@ export const CURATED_LIVING_ROOM_TV = "media_player.living_room_living_room_tv_o
  */
 export const CURATED_SPOTIFY_TARGET = "media_player.living_room_tv_1248686237_spotcast";
 
+/**
+ * Entities the phone's "On right now" tile never counts — things that are
+ * meant to stay on (decorative LEDs, ...). It otherwise lists every room
+ * toggle, Hue group and TV above that's on, plus any other light HA reports
+ * as on.
+ */
+export const ON_NOW_IGNORE: string[] = [];
+
 export interface QuickAction {
   key: string;
   label: string;

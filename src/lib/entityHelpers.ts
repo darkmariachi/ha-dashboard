@@ -11,6 +11,9 @@ export function isDead(ent: EntityWithArea): boolean {
   return DEAD_STATES.has(ent.entity.state);
 }
 
+/** States that mean "this is on" across lights, switches, fans and TVs. */
+export const ON_STATES = new Set(["on", "playing", "paused", "idle", "buffering"]);
+
 export function isOn(ent: EntityWithArea): boolean {
   return ["on", "playing", "home", "open", "unlocked", "cleaning"].includes(
     ent.entity.state,
