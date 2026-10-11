@@ -30,6 +30,7 @@ export function useStateHistory(
   const key = entityIds.join(",");
 
   useEffect(() => {
+    if (!key) return;
     let cancelled = false;
     function load() {
       sendMessage<Record<string, Compressed[]>>({

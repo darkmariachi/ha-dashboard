@@ -15,6 +15,8 @@ export interface EntityRegistryEntry {
   entity_id: string;
   area_id: string | null;
   device_id: string | null;
+  /** The integration that created it, e.g. "androidtv_remote". */
+  platform: string;
 }
 
 export type ConnectionStatus =
@@ -32,6 +34,7 @@ export interface EntityWithArea {
   areaId: string | null;
   areaName: string | null;
   deviceId: string | null;
+  platform: string | null;
   friendlyName: string;
 }
 

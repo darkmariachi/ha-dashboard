@@ -1,53 +1,26 @@
 import { Gamepad2, Plus } from "lucide-react";
-import clsx from "clsx";
 import { GAMING } from "../../config/gaming";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
 import { useStateHistory, type StatePoint } from "../home/useStateHistory";
+import { DAYS, Dot, WeekChart, addSpan, dayStarts, hm, lastSeen, mondayStart } from "./screenTime";
 
 const PS5 = "#0070d1"; // PlayStation blue
 const SWITCH = "#e60012"; // Nintendo red
 const TINT = "#d3e6fb";
-const DAYS = 7;
 const BONUS_MINUTES = 15;
-
-/** Minutes -> "1 h 25 min" / "12 min". */
-function hm(mins: number) {
-  const m = Math.round(mins);
-  if (m < 60) return `${m} min`;
-  return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`;
-}
-
-/** Local midnights for the last DAYS days, oldest first. */
-function dayStarts(now: Date) {
-  const out: number[] = [];
-  for (let i = DAYS - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - i);
-    out.push(d.getTime());
-  }
-  return out;
-}
 
 function dayIndex(t: number, starts: number[]) {
   for (let i = starts.length - 1; i >= 0; i--) if (t >= starts[i]) return i;
   return -1;
 }
 
-/** PS5: minutes per day spent in an active media-player state, splitting
- * sessions that cross midnight. */
+/** PS5: minutes per day spent in an active media-player state. */
 function ps5Daily(points: StatePoint[], active: string[], starts: number[], now: number) {
   const totals = new Array<number>(DAYS).fill(0);
   points.forEach((p, i) => {
     if (!active.includes(p.state)) return;
-    const start = Math.max(p.t, starts[0]);
-    const end = i + 1 < points.length ? points[i + 1].t : now;
-    starts.forEach((s, d) => {
-      const dayEnd = d + 1 < DAYS ? starts[d + 1] : now;
-      const overlap = Math.min(end, dayEnd) - Math.max(start, s);
-      if (overlap > 0) totals[d] += overlap / 60000;
-    });
+    addSpan(totals, Math.max(p.t, starts[0]), i + 1 < points.length ? points[i + 1].t : now, starts, now);
   });
   return totals;
 }
@@ -62,52 +35,6 @@ function switchDaily(points: StatePoint[], starts: number[]) {
     if (d >= 0 && Number.isFinite(v)) totals[d] = Math.max(totals[d], v);
   }
   return totals;
-}
-
-function WeekChart({ ps5, sw, starts }: { ps5: number[]; sw: number[]; starts: number[] }) {
-  const max = Math.max(60, ...ps5.map((v, i) => v + sw[i]));
-  return (
-    <div className="flex h-28 items-end gap-2">
-      {starts.map((s, i) => {
-        const total = ps5[i] + sw[i];
-        const today = i === DAYS - 1;
-        return (
-          <div key={s} className="flex flex-1 flex-col items-center gap-1">
-            <span className="text-[10px] font-semibold tabular-nums text-text-dim">
-              {total >= 3 ? (total >= 60 ? `${(total / 60).toFixed(1)}h` : `${Math.round(total)}m`) : ""}
-            </span>
-            <div className={clsx("flex h-16 w-full flex-col justify-end overflow-hidden rounded-md", !today && "opacity-70")}>
-              {total > 0 ? (
-                <>
-                  <div style={{ height: `${(sw[i] / max) * 100}%`, background: SWITCH }} />
-                  <div style={{ height: `${(ps5[i] / max) * 100}%`, background: PS5 }} />
-                </>
-              ) : (
-                <div className="h-[2px] bg-text-dim/30" />
-              )}
-            </div>
-            <span className={clsx("text-[11px]", today ? "font-bold text-text" : "text-text-dim")}>
-              {today ? "Today" : new Date(s).toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function lastSeen(t: number | undefined, now: Date) {
-  if (t === undefined || Number.isNaN(t)) return null;
-  const time = new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  if (t >= startOfToday.getTime()) return `today ${time}`;
-  if (t >= startOfToday.getTime() - 86400000) return `yesterday ${time}`;
-  return `${new Date(t).toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
-}
-
-function Dot({ color }: { color: string }) {
-  return <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />;
 }
 
 /** Andy's console time across the PS5 and the Switch: what he's on now,
@@ -148,10 +75,8 @@ export function GamingCard({ index = 0 }: { index?: number }) {
   const swDays = history ? switchDaily(swPoints, starts) : null;
   if (swDays) swDays[DAYS - 1] = Math.max(swDays[DAYS - 1], swTodayMin);
   // Monday-based week for the Switch, to match the PS5 week sensor.
-  const monday = new Date(now);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const swWeekMin = swDays ? swDays.reduce((sum, v, i) => (starts[i] >= monday.getTime() ? sum + v : sum), 0) : swTodayMin;
+  const monday = mondayStart(now);
+  const swWeekMin = swDays ? swDays.reduce((sum, v, i) => (starts[i] >= monday ? sum + v : sum), 0) : swTodayMin;
 
   const firstTracked = Math.min(ps5Points[0]?.t ?? Infinity, swPoints[0]?.t ?? Infinity);
   const partial = history && Number.isFinite(firstTracked) && firstTracked > starts[0] + 3600000;
@@ -244,7 +169,13 @@ export function GamingCard({ index = 0 }: { index?: number }) {
           </span>
         </div>
         {ps5Days && swDays ? (
-          <WeekChart ps5={ps5Days} sw={swDays} starts={starts} />
+          <WeekChart
+            series={[
+              { color: SWITCH, days: swDays },
+              { color: PS5, days: ps5Days },
+            ]}
+            starts={starts}
+          />
         ) : (
           <div className="h-28 animate-pulse rounded-2xl bg-chip" />
         )}

@@ -20,6 +20,7 @@ import { ComputerCard } from "../devices/ComputerCard";
 import { NotificationsCard } from "../devices/NotificationsCard";
 import { QuickActionLink } from "./QuickActionLink";
 import { GamingCard } from "../devices/GamingCard";
+import { YouTubeCard } from "../devices/YouTubeCard";
 import { RoomCard } from "../home/RoomCard";
 import { StatusBar } from "../home/StatusBar";
 import { SprinklersCard } from "../home/SprinklersCard";
@@ -162,10 +163,11 @@ function DevicesTab() {
       <PageTitle>Devices</PageTitle>
       <div className="flex flex-col gap-3">
         <GamingCard />
+        <YouTubeCard index={1} />
         {CURATED_COMPUTERS.map((c, i) => (
-          <ComputerCard key={c.key} computer={c} index={i + 1} />
+          <ComputerCard key={c.key} computer={c} index={i + 2} />
         ))}
-        <NotificationsCard index={CURATED_COMPUTERS.length + 1} />
+        <NotificationsCard index={CURATED_COMPUTERS.length + 2} />
       </div>
     </>
   );

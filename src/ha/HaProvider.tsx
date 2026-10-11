@@ -246,6 +246,7 @@ export function HaProvider({ children }: { children: React.ReactNode }) {
         areaId: areaId ?? null,
         areaName: areaId ? (areaNameMap.get(areaId) ?? null) : null,
         deviceId: reg?.device_id ?? null,
+        platform: reg?.platform ?? null,
         friendlyName: friendlyNameOf(entityId, entity.attributes),
       };
     }

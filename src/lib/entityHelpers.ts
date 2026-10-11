@@ -84,6 +84,7 @@ export function resolveCuratedCamera(
     areaId: null,
     areaName: null,
     deviceId: null,
+    platform: null,
     friendlyName: cam.label,
   };
 }
