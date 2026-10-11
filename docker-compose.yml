@@ -29,6 +29,7 @@ services:
       HA_TOKEN: ${PUSH_HA_TOKEN:-}
       DOOR_ALERT_MINUTES: ${DOOR_ALERT_MINUTES:-2}
       DOOR_REPEAT_MINUTES: ${DOOR_REPEAT_MINUTES:-10}
+      DOOR_OFFLINE_MINUTES: ${DOOR_OFFLINE_MINUTES:-10}
     volumes:
       - ./push-data:/data
     # LAN only, for HA (rest_command.dashboard_push -> :8094/send). 8082 is

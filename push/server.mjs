@@ -33,6 +33,8 @@ const {
   DOOR_SENSORS = "binary_sensor.front_door_sensor=Front Door,binary_sensor.garage_door_sensor=Garage Door,binary_sensor.print_room_garage_door=Print Room Garage Door",
   DOOR_ALERT_MINUTES = "2",
   DOOR_REPEAT_MINUTES = "10",
+  // A sensor silent this long gets a "sensor is offline" alert; 0 = never.
+  DOOR_OFFLINE_MINUTES = "10",
 } = process.env;
 
 if (!PUSH_SECRET || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
@@ -195,6 +197,7 @@ if (HA_TOKEN) {
     doors: parseDoors(DOOR_SENSORS),
     thresholdMs: Number(DOOR_ALERT_MINUTES) * 60_000,
     repeatMs: Number(DOOR_REPEAT_MINUTES) * 60_000,
+    offlineMs: Number(DOOR_OFFLINE_MINUTES) * 60_000,
     notify: (payload) => deliver(Object.keys(subs), payload),
     log,
   });
