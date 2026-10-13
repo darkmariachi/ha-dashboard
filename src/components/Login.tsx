@@ -1,13 +1,85 @@
 import { Home, Loader2 } from "lucide-react";
-import { useState } from "react";
+import qrcode from "qrcode-generator";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useHa } from "../ha/HaProvider";
 import { normalizeHassUrl } from "../ha/connection";
+import { newPairingCode, pairingSupported, pairingUrl, pollLogin } from "../lib/pair";
+
+const PAIR_POLL_MS = 2000;
+/** A code left on screen is swapped for a fresh one this often. */
+const PAIR_ROTATE_MS = 5 * 60_000;
+
+function QrCode({ text }: { text: string }) {
+  const { size, path } = useMemo(() => {
+    const qr = qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    const count = qr.getModuleCount();
+    let d = "";
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (qr.isDark(row, col)) d += `M${col} ${row}h1v1h-1z`;
+      }
+    }
+    return { size: count, path: d };
+  }, [text]);
+  // Always black on white with a 4-module quiet zone, whatever the theme —
+  // phone cameras struggle with anything else.
+  return (
+    <svg
+      viewBox={`-4 -4 ${size + 8} ${size + 8}`}
+      shapeRendering="crispEdges"
+      role="img"
+      aria-label="Sign-in QR code"
+      className="h-48 w-48 rounded-xl bg-white"
+    >
+      <path d={path} fill="#000" />
+    </svg>
+  );
+}
 
 export function Login() {
   const { login, status, error } = useHa();
+  const { pathname } = useLocation();
   const [hassUrl, setHassUrl] = useState("");
   const [token, setToken] = useState("");
   const connecting = status === "connecting";
+  // A phone that scanned a code but isn't signed in itself lands here on
+  // /pair; it needs the form, not a code of its own.
+  const approving = pathname.startsWith("/pair");
+  const [pairing, setPairing] = useState(() =>
+    pairingSupported() && !approving ? newPairingCode() : null,
+  );
+
+  // Wait for a signed-in phone to approve the code on screen (lib/pair.ts).
+  useEffect(() => {
+    if (!pairing) return;
+    let done = false;
+    const poll = setInterval(async () => {
+      if (done) return;
+      let creds;
+      try {
+        creds = await pollLogin(pairing);
+      } catch {
+        return; // relay unreachable; keep trying
+      }
+      if (!creds || done) return;
+      done = true;
+      try {
+        await login(creds.hassUrl, creds.token);
+      } catch {
+        // Error is surfaced via context; the code is spent either way.
+        setPairing(newPairingCode());
+      }
+    }, PAIR_POLL_MS);
+    const rotate = setTimeout(() => setPairing(newPairingCode()), PAIR_ROTATE_MS);
+    return () => {
+      done = true;
+      clearInterval(poll);
+      clearTimeout(rotate);
+    };
+  }, [pairing, login]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,6 +103,28 @@ export function Login() {
             <div className="text-xs text-text-dim">Connect to Home Assistant</div>
           </div>
         </div>
+
+        {approving && (
+          <p className="mb-4 text-xs text-text-dim">
+            Sign in on this phone first, then you can approve the other device.
+          </p>
+        )}
+
+        {pairing && (
+          <>
+            <div className="flex flex-col items-center gap-3">
+              <QrCode text={pairingUrl(pairing)} />
+              <p className="text-center text-xs text-text-dim">
+                Scan with a phone that's already signed in to this dashboard.
+              </p>
+            </div>
+            <div className="my-5 flex items-center gap-3 text-[11px] text-text-dim">
+              <div className="h-px flex-1 bg-border" />
+              or connect manually
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">

@@ -42,6 +42,16 @@ In Home Assistant: click your profile (bottom left) → **Security** tab →
 scroll to **Long-lived access tokens** → **Create Token**. Copy it
 somewhere safe — HA only shows it once.
 
+### Signing in more devices with a QR code
+
+Once one phone is signed in, you don't have to type the token again on a
+fridge, tablet or TV: the login screen shows a QR code, and scanning it with
+the signed-in phone opens an approval page. Approving creates a separate
+long-lived token for the new device (named on that page, revocable from the
+same **Security** tab) and passes it across, encrypted, through the push
+service. This needs the dashboard on `https://` and the `push` container
+running.
+
 ## 2. Run it locally (optional, for tweaking)
 
 ```bash

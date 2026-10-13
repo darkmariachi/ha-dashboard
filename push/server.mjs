@@ -9,10 +9,16 @@
 //   POST /unsubscribe    { endpoint, token }
 //   POST /test           { endpoint, token }
 //   POST /send           (x-push-secret) { title, message, url?, tag?, people? }
+//   POST /pair/complete  { id, token, blob }
+//   POST /pair/poll      { id } -> { blob | null }
 //   GET  /health
 //
 // A subscription is only accepted from someone holding a valid Home
 // Assistant token (checked against HA's API), since the dashboard is public.
+//
+// /pair/* relays a QR sign-in (src/lib/pair.ts): a signed-in phone leaves an
+// encrypted login under the id a new device is showing, and that device
+// picks it up once. The key never comes here, so the blob is opaque.
 
 import { createServer } from "node:http";
 import { readFile, writeFile, rename } from "node:fs/promises";
@@ -55,6 +61,17 @@ async function save() {
   const tmp = `${DATA_FILE}.tmp`;
   await writeFile(tmp, JSON.stringify(subs, null, 2));
   await rename(tmp, DATA_FILE);
+}
+
+/** id -> { blob, expires }. Memory only: a pairing is over in seconds. */
+const pairings = new Map();
+const PAIR_TTL_MS = 2 * 60_000;
+const PAIR_MAX = 100;
+const PAIR_ID = /^[A-Za-z0-9_-]{22}$/;
+
+function prunePairings() {
+  const now = Date.now();
+  for (const [id, p] of pairings) if (p.expires <= now) pairings.delete(id);
 }
 
 function log(...args) {
@@ -168,6 +185,29 @@ const server = createServer(async (req, res) => {
         tag: "test",
       });
       return reply(res, 200, { sent });
+    }
+
+    if (req.method === "POST" && path === "/pair/complete") {
+      const { id, token, blob } = await body(req);
+      if (typeof id !== "string" || !PAIR_ID.test(id)) return reply(res, 400, { error: "bad id" });
+      if (typeof blob !== "string" || !blob || blob.length > 4096) return reply(res, 400, { error: "bad blob" });
+      if (!(await validHaToken(token))) return reply(res, 401, { error: "invalid Home Assistant token" });
+      prunePairings();
+      if (pairings.size >= PAIR_MAX) return reply(res, 429, { error: "too many pending sign-ins" });
+      pairings.set(id, { blob, expires: Date.now() + PAIR_TTL_MS });
+      log("pairing ready");
+      return reply(res, 200, { ok: true });
+    }
+
+    if (req.method === "POST" && path === "/pair/poll") {
+      const { id } = await body(req);
+      if (typeof id !== "string" || !PAIR_ID.test(id)) return reply(res, 400, { error: "bad id" });
+      prunePairings();
+      const pairing = pairings.get(id);
+      if (!pairing) return reply(res, 200, { blob: null });
+      pairings.delete(id);
+      log("pairing collected");
+      return reply(res, 200, { blob: pairing.blob });
     }
 
     if (req.method === "POST" && path === "/send") {

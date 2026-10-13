@@ -9,6 +9,7 @@ import { DoorAlertMonitor } from "./components/DoorAlertMonitor";
 import { HomeScreen } from "./components/HomeScreen";
 import { Login } from "./components/Login";
 import { OverviewPage } from "./components/OverviewPage";
+import { PairPage } from "./components/PairPage";
 import { PhoneScreen } from "./components/phone/PhoneScreen";
 import { Sidebar } from "./components/Sidebar";
 import { SettingsPage } from "./components/SettingsPage";
@@ -30,7 +31,9 @@ function Splash() {
 function App() {
   const { status } = useHa();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isPhone = useLocation().pathname.startsWith("/phone");
+  const { pathname } = useLocation();
+  const isPhone = pathname.startsWith("/phone");
+  const isPair = pathname.startsWith("/pair");
   // Once we've been connected, a drop (phone screen off, Wi-Fi to mobile
   // handoff, HA restart) shouldn't throw everyone back to the login form —
   // the library reconnects on its own, so keep the UI up with a banner.
@@ -74,7 +77,7 @@ function App() {
       )}
 
       {/* The phone layout has its own bottom tab bar instead of the drawer. */}
-      {!isPhone && (
+      {!isPhone && !isPair && (
         <>
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -96,12 +99,13 @@ function App() {
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/area/:areaSlug" element={<AreaPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/pair" element={<PairPage />} />
         </Routes>
       </main>
 
       {/* The loud door alarm is for the wall tablet; a phone away from home
           shouldn't start blaring. The Doors tile still shows what's open. */}
-      {!isPhone && <DoorAlertMonitor />}
+      {!isPhone && !isPair && <DoorAlertMonitor />}
     </div>
   );
 }

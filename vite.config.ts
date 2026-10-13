@@ -25,6 +25,12 @@ export default defineConfig(({ mode }) => {
           rewrite: () => '/api/token',
           headers: spotifyAuth ? { Authorization: `Basic ${spotifyAuth}` } : {},
         },
+        // Dev twin of nginx's /api/push/ location, for a push service run
+        // locally (`node push/server.mjs`) — QR sign-in relays through it.
+        '/api/push': {
+          target: env.PUSH_DEV_URL || 'http://localhost:8082',
+          rewrite: (path) => path.replace(/^\/api\/push/, ''),
+        },
       },
     },
   }
