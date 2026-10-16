@@ -7,6 +7,7 @@ import { primeAudio } from "./lib/alarmSound";
 import { AreaPage } from "./components/AreaPage";
 import { DoorAlertMonitor } from "./components/DoorAlertMonitor";
 import { HomeScreen } from "./components/HomeScreen";
+import { InsightsPage } from "./components/insights/InsightsPage";
 import { Login } from "./components/Login";
 import { OverviewPage } from "./components/OverviewPage";
 import { PairPage } from "./components/PairPage";
@@ -96,6 +97,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeScreen />} />
           <Route path="/phone/*" element={<PhoneScreen />} />
+          <Route path="/insights" element={<InsightsPage />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/area/:areaSlug" element={<AreaPage />} />
           <Route path="/settings" element={<SettingsPage />} />

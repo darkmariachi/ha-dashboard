@@ -1,5 +1,5 @@
 /**
- * Andy's consoles, for the gaming card on the Devices tab.
+ * Andy's consoles, for the gaming card on the Insights tab.
  *
  * PS5: the PlayStation Network integration, on the PSN account he plays on
  * (it's under Rodolfo's name, "rufongora"). Its media player is off / on

@@ -1,4 +1,4 @@
-import { Cctv, Cpu, House, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Cctv, ChartColumn, Cpu, House, LayoutGrid, type LucideIcon } from "lucide-react";
 import { createElement } from "react";
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import clsx from "clsx";
@@ -18,8 +18,8 @@ import { CameraCard } from "../cards/CameraCard";
 import { ActivityFeed } from "../home/ActivityFeed";
 import { ComputerCard } from "../devices/ComputerCard";
 import { NotificationsCard } from "../devices/NotificationsCard";
+import { InsightsColumn } from "../insights/InsightsPage";
 import { QuickActionLink } from "./QuickActionLink";
-import { GamingCard } from "../devices/GamingCard";
 import { YouTubeCard } from "../devices/YouTubeCard";
 import { RoomCard } from "../home/RoomCard";
 import { StatusBar } from "../home/StatusBar";
@@ -162,13 +162,21 @@ function DevicesTab() {
     <>
       <PageTitle>Devices</PageTitle>
       <div className="flex flex-col gap-3">
-        <GamingCard />
-        <YouTubeCard index={1} />
+        <YouTubeCard />
         {CURATED_COMPUTERS.map((c, i) => (
-          <ComputerCard key={c.key} computer={c} index={i + 2} />
+          <ComputerCard key={c.key} computer={c} index={i + 1} />
         ))}
-        <NotificationsCard index={CURATED_COMPUTERS.length + 2} />
+        <NotificationsCard index={CURATED_COMPUTERS.length + 1} />
       </div>
+    </>
+  );
+}
+
+function InsightsTab() {
+  return (
+    <>
+      <PageTitle>Insights</PageTitle>
+      <InsightsColumn />
     </>
   );
 }
@@ -178,6 +186,7 @@ const TABS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: "/phone/rooms", label: "Rooms", icon: LayoutGrid },
   { to: "/phone/cameras", label: "Cameras", icon: Cctv },
   { to: "/phone/devices", label: "Devices", icon: Cpu },
+  { to: "/phone/insights", label: "Insights", icon: ChartColumn },
 ];
 
 function TabBar() {
@@ -243,6 +252,7 @@ export function PhoneScreen() {
           <Route path="rooms" element={<RoomsTab />} />
           <Route path="cameras" element={<CamerasTab />} />
           <Route path="devices" element={<DevicesTab />} />
+          <Route path="insights" element={<InsightsTab />} />
         </Routes>
       </div>
 

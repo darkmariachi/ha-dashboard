@@ -1,4 +1,4 @@
-import { Home, LogOut, Settings } from "lucide-react";
+import { ChartColumn, Home, LogOut, Settings } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
 import { useHa } from "../ha/HaProvider";
@@ -48,6 +48,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
         <nav className="flex-1 overflow-y-auto px-2">
           <NavItem to="/" icon={Home} label="Home" end onNavigate={onClose} />
+          <NavItem to="/insights" icon={ChartColumn} label="Insights" onNavigate={onClose} />
           <NavItem to="/overview" icon={OVERVIEW_ICON} label="All Areas" onNavigate={onClose} />
           <div className="mt-3 mb-1 px-2 text-[11px] font-medium uppercase tracking-wide text-text-dim">
             Rooms
