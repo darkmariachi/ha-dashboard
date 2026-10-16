@@ -1,5 +1,6 @@
-import { Droplets, Fan, Flame, Power, Snowflake, Thermometer, X } from "lucide-react";
+import { Droplets, Fan, Flame, Minus, Plus, Power, Snowflake, Thermometer, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useHa } from "../../ha/HaProvider";
 import { clsx } from "clsx";
 import { RadialDial } from "./RadialDial";
@@ -14,6 +15,8 @@ const MODE_META: Record<string, { icon: LucideIcon; label: string }> = {
   dry: { icon: Droplets, label: "Dry" },
 };
 
+type TempKey = "temperature" | "target_temp_low" | "target_temp_high";
+
 function modeMeta(mode: string) {
   return MODE_META[mode] ?? { icon: Thermometer, label: mode };
 }
@@ -27,15 +30,24 @@ export function ClimateControlModal({
 }) {
   const { entities, callService } = useHa();
   const entity = entities[entityId];
+  // Values picked with the +/- buttons but not yet reported back by HA, so
+  // rapid taps stack up and go out as a single set_temperature call.
+  const [draft, setDraft] = useState<Partial<Record<TempKey, number>>>({});
+  const sendTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const haTarget = entity?.attributes.temperature as number | undefined;
+  const haLow = entity?.attributes.target_temp_low as number | undefined;
+  const haHigh = entity?.attributes.target_temp_high as number | undefined;
+  useEffect(() => setDraft({}), [haTarget, haLow, haHigh]);
 
   if (!entity) return null;
 
   const attrs = entity.attributes;
   const mode = entity.state; // off | heat | cool | heat_cool | auto | fan_only | dry
   const current = attrs.current_temperature as number | undefined;
-  const target = attrs.temperature as number | undefined;
-  const targetLow = attrs.target_temp_low as number | undefined;
-  const targetHigh = attrs.target_temp_high as number | undefined;
+  const target = draft.temperature ?? haTarget;
+  const targetLow = draft.target_temp_low ?? haLow;
+  const targetHigh = draft.target_temp_high ?? haHigh;
   const hvacAction = attrs.hvac_action as string | undefined;
   const step = (attrs.target_temp_step as number | undefined) ?? 1;
   const minTemp = (attrs.min_temp as number | undefined) ?? 50;
@@ -80,6 +92,29 @@ export function ClimateControlModal({
     ).catch(() => {});
   }
 
+  function nudge(key: TempKey, delta: number) {
+    const base = key === "temperature" ? target : key === "target_temp_low" ? targetLow : targetHigh;
+    if (typeof base !== "number") return;
+    let next = Math.min(maxTemp, Math.max(minTemp, Math.round((base + delta) / step) * step));
+    if (key === "target_temp_low" && typeof targetHigh === "number") next = Math.min(next, targetHigh - step);
+    if (key === "target_temp_high" && typeof targetLow === "number") next = Math.max(next, targetLow + step);
+    if (next === base) return;
+    const nextDraft = { ...draft, [key]: next };
+    setDraft(nextDraft);
+    clearTimeout(sendTimer.current);
+    sendTimer.current = setTimeout(() => {
+      const data = isRange
+        ? {
+            target_temp_low: nextDraft.target_temp_low ?? targetLow,
+            target_temp_high: nextDraft.target_temp_high ?? targetHigh,
+          }
+        : { temperature: nextDraft.temperature };
+      callService("climate", "set_temperature", data, { entity_id: entityId }).catch(() =>
+        setDraft({}),
+      );
+    }, 600);
+  }
+
   function dialColorFor(m: string) {
     if (m === "cool") return "var(--color-accent)";
     if (m === "heat") return "var(--color-warn)";
@@ -118,7 +153,7 @@ export function ClimateControlModal({
             Turn on heat or cool to set a target
           </div>
         ) : isRange ? (
-          <div className="flex justify-center py-1">
+          <div className="flex flex-col items-center gap-3 py-1">
             <RadialDial
               min={minTemp}
               max={maxTemp}
@@ -137,9 +172,23 @@ export function ClimateControlModal({
                 },
               ]}
             />
+            <div className="flex w-full justify-around">
+              <Stepper
+                label="Low"
+                color="var(--color-accent)"
+                onDown={() => nudge("target_temp_low", -step)}
+                onUp={() => nudge("target_temp_low", step)}
+              />
+              <Stepper
+                label="High"
+                color="var(--color-warn)"
+                onDown={() => nudge("target_temp_high", -step)}
+                onUp={() => nudge("target_temp_high", step)}
+              />
+            </div>
           </div>
         ) : typeof target === "number" ? (
-          <div className="flex justify-center py-1">
+          <div className="flex flex-col items-center gap-3 py-1">
             <RadialDial
               min={minTemp}
               max={maxTemp}
@@ -152,6 +201,10 @@ export function ClimateControlModal({
                   onCommit: setSingleTarget,
                 },
               ]}
+            />
+            <Stepper
+              onDown={() => nudge("temperature", -step)}
+              onUp={() => nudge("temperature", step)}
             />
           </div>
         ) : null}
@@ -209,6 +262,36 @@ export function ClimateControlModal({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function Stepper({
+  label,
+  color,
+  onDown,
+  onUp,
+}: {
+  label?: string;
+  color?: string;
+  onDown: () => void;
+  onUp: () => void;
+}) {
+  const btn =
+    "flex h-11 w-11 items-center justify-center rounded-full bg-chip text-text transition-colors hover:bg-chip-hover active:scale-95";
+  return (
+    <div className="flex items-center gap-3">
+      <button onClick={onDown} aria-label={`Lower ${label ?? "target"} temperature`} className={btn}>
+        <Minus size={18} />
+      </button>
+      {label && (
+        <span className="w-9 text-center text-[11px] font-medium uppercase tracking-wide" style={{ color }}>
+          {label}
+        </span>
+      )}
+      <button onClick={onUp} aria-label={`Raise ${label ?? "target"} temperature`} className={btn}>
+        <Plus size={18} />
+      </button>
     </div>
   );
 }
