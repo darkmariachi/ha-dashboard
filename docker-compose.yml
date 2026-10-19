@@ -30,6 +30,10 @@ services:
       DOOR_ALERT_MINUTES: ${DOOR_ALERT_MINUTES:-2}
       DOOR_REPEAT_MINUTES: ${DOOR_REPEAT_MINUTES:-10}
       DOOR_OFFLINE_MINUTES: ${DOOR_OFFLINE_MINUTES:-10}
+      # "Lights are unreachable" alerts (which lights: UNREACHABLE_GROUPS in
+      # push/server.mjs). Uses HA_TOKEN too.
+      UNREACHABLE_MINUTES: ${UNREACHABLE_MINUTES:-2}
+      UNREACHABLE_PEOPLE: ${UNREACHABLE_PEOPLE:-rodolfo,priscilla}
     volumes:
       - ./push-data:/data
     # LAN only, for HA (rest_command.dashboard_push -> :8094/send). 8082 is

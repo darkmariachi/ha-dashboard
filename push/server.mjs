@@ -13,6 +13,9 @@
 //   POST /pair/poll      { id } -> { blob | null }
 //   GET  /health
 //
+// With HA_TOKEN set it also pushes alerts on its own: doors left open
+// (doors.mjs) and lights that dropped off the network (reachability.mjs).
+//
 // A subscription is only accepted from someone holding a valid Home
 // Assistant token (checked against HA's API), since the dashboard is public.
 //
@@ -25,6 +28,7 @@ import { readFile, writeFile, rename } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { parseDoors, startDoorWatcher } from "./doors.mjs";
+import { parseGroups, startReachabilityWatcher } from "./reachability.mjs";
 
 const {
   PORT = "8082",
@@ -41,6 +45,12 @@ const {
   DOOR_REPEAT_MINUTES = "10",
   // A sensor silent this long gets a "sensor is offline" alert; 0 = never.
   DOOR_OFFLINE_MINUTES = "10",
+  // "Lights are unreachable" alerts (reachability.mjs), e.g. smart bulbs
+  // behind a wall switch. "Label:entity,entity;Label2:entity"; empty = off.
+  UNREACHABLE_GROUPS = "Driveway lights:light.hue_color_lamp_1,light.hue_color_lamp_2,light.hue_color_lamp_3,light.hue_color_lamp_4,light.hue_color_lamp_5",
+  UNREACHABLE_MINUTES = "2",
+  // Who gets them (subscription `person`); empty = everyone.
+  UNREACHABLE_PEOPLE = "rodolfo,priscilla",
 } = process.env;
 
 if (!PUSH_SECRET || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
@@ -142,6 +152,13 @@ async function deliver(endpoints, payload) {
   return sent;
 }
 
+/** Subscriptions belonging to any of `people` (case-insensitive); all of
+ * them when the list is empty. */
+function targetsFor(people) {
+  const wanted = Array.isArray(people) && people.length ? people.map((p) => String(p).toLowerCase()) : null;
+  return Object.keys(subs).filter((e) => !wanted || wanted.includes((subs[e].person || "").toLowerCase()));
+}
+
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, "http://x").pathname;
   try {
@@ -214,8 +231,7 @@ const server = createServer(async (req, res) => {
       if (!secretOk(req.headers["x-push-secret"])) return reply(res, 401, { error: "bad secret" });
       const { title, message, url, tag, people } = await body(req);
       if (!title && !message) return reply(res, 400, { error: "title or message required" });
-      const wanted = Array.isArray(people) && people.length ? people.map((p) => String(p).toLowerCase()) : null;
-      const targets = Object.keys(subs).filter((e) => !wanted || wanted.includes((subs[e].person || "").toLowerCase()));
+      const targets = targetsFor(people);
       const sent = await deliver(targets, { title: title ?? "", message: message ?? "", url: url || "/phone", tag: tag || undefined });
       log("sent", JSON.stringify(title), "to", sent, "of", targets.length);
       return reply(res, 200, { sent, targets: targets.length });
@@ -243,4 +259,17 @@ if (HA_TOKEN) {
   });
 } else {
   log("HA_TOKEN not set — door-open alerts disabled");
+}
+
+const unreachableGroups = parseGroups(UNREACHABLE_GROUPS);
+if (HA_TOKEN && unreachableGroups.length) {
+  const people = UNREACHABLE_PEOPLE.split(",").map((p) => p.trim()).filter(Boolean);
+  startReachabilityWatcher({
+    haUrl: HA_URL,
+    token: HA_TOKEN,
+    groups: unreachableGroups,
+    thresholdMs: Number(UNREACHABLE_MINUTES) * 60_000,
+    notify: (payload) => deliver(targetsFor(people), payload),
+    log,
+  });
 }
