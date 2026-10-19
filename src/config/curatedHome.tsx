@@ -277,6 +277,17 @@ export const CURATED_SPOTIFY_TARGET = "media_player.living_room_tv_1248686237_sp
  */
 export const ON_NOW_IGNORE: string[] = [];
 
+/** Left alone by the bulk "turn everything off"s ("We're leaving", the On
+ * right now sheet's turn-off-all) — still listed and individually
+ * switchable. */
+export const ALL_OFF_KEEP: string[] = ["light.office"];
+
+/** Indoor lights that aren't on the Home screen's room grid but should still
+ * go off with everything else. */
+export const ALL_OFF_EXTRA: { entityId: string; label: string; room: string }[] = [
+  { entityId: "switch.andy_s_bedroom_light", label: "Light", room: "Andy's Room" },
+];
+
 export interface QuickAction {
   key: string;
   label: string;
@@ -310,15 +321,17 @@ export const CURATED_QUICK_ACTIONS: QuickAction[] = [
     label: "We're leaving",
     icon: DoorOpen,
     action: "turn_off",
-    description: "Turning off every indoor light, fan, and TV. Driveway and backyard stay as they are.",
+    description:
+      "Turning off every indoor light, fan, and TV except the office Hue lights. Driveway and backyard stay as they are.",
     // Every indoor room's lights/fans — driveway and backyard (external:
     // true) are left alone, since you'd still want those on while out.
     entityIds: [
       ...CURATED_ROOMS.filter((r) => !r.external).flatMap((r) => r.toggles.map((t) => t.entityId)),
       // Indoor rooms' Hue groups too, so "everything off" really is.
       ...CURATED_ROOMS.filter((r) => !r.external && r.lights).map((r) => r.lights!),
+      ...ALL_OFF_EXTRA.map((e) => e.entityId),
       ...CURATED_INDOOR_TVS,
-    ],
+    ].filter((id) => !ALL_OFF_KEEP.includes(id)),
   },
   {
     key: "party",

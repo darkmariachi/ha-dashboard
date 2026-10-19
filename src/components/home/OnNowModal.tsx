@@ -1,5 +1,12 @@
 import { Lightbulb, SunDim, Tv, type LucideIcon } from "lucide-react";
-import { CURATED_ROOMS, CURATED_TVS, HOUSEHOLD_PEOPLE, ON_NOW_IGNORE } from "../../config/curatedHome";
+import {
+  ALL_OFF_EXTRA,
+  ALL_OFF_KEEP,
+  CURATED_ROOMS,
+  CURATED_TVS,
+  HOUSEHOLD_PEOPLE,
+  ON_NOW_IGNORE,
+} from "../../config/curatedHome";
 import { useHa } from "../../ha/HaProvider";
 import { ON_STATES } from "../../lib/entityHelpers";
 import { Sheet, SheetSection } from "./Sheet";
@@ -63,6 +70,12 @@ export function useOnNow() {
     }
   }
 
+  for (const extra of ALL_OFF_EXTRA) {
+    if (entities[extra.entityId]?.state === "on") {
+      add({ ...extra, icon: Lightbulb, outdoor: false });
+    }
+  }
+
   for (const tv of CURATED_TVS) {
     if (ON_STATES.has(entities[tv.player]?.state ?? "")) {
       add({ entityId: tv.player, label: tv.name, room: "TVs", icon: Tv, outdoor: false });
@@ -91,12 +104,15 @@ export function useOnNow() {
   const away =
     people.length > 0 && people.every((s) => s !== undefined && s !== "home" && s !== "unknown" && s !== "unavailable");
 
-  return { items, indoor: items.filter((i) => !i.outdoor), away };
+  const indoor = items.filter((i) => !i.outdoor);
+  // What the turn-off-all button covers: indoors, minus what stays on.
+  const allOff = indoor.filter((i) => !ALL_OFF_KEEP.includes(i.entityId));
+  return { items, indoor, allOff, away };
 }
 
 export function OnNowModal({ onClose }: { onClose: () => void }) {
   const { callService } = useHa();
-  const { items, indoor, away } = useOnNow();
+  const { items, allOff, away } = useOnNow();
 
   function turnOff(ids: string[]) {
     navigator.vibrate?.(10);
@@ -105,7 +121,7 @@ export function OnNowModal({ onClose }: { onClose: () => void }) {
 
   const rooms = new Map<string, OnItem[]>();
   for (const item of items) rooms.set(item.room, [...(rooms.get(item.room) ?? []), item]);
-  const outdoorCount = items.length - indoor.length;
+  const keptCount = items.length - allOff.length;
 
   return (
     <Sheet
@@ -140,17 +156,19 @@ export function OnNowModal({ onClose }: { onClose: () => void }) {
         </SheetSection>
       ))}
 
-      {indoor.length > 1 && (
+      {allOff.length > 1 && (
         <div className="flex flex-col gap-2">
           <button
-            onClick={() => turnOff(indoor.map((i) => i.entityId))}
+            onClick={() => turnOff(allOff.map((i) => i.entityId))}
             className="rounded-full py-3 text-sm font-semibold text-white active:scale-95"
             style={{ background: "#4f79c9" }}
           >
-            {outdoorCount > 0 ? `Turn off the ${indoor.length} indoors` : `Turn off all ${indoor.length}`}
+            {keptCount > 0 ? `Turn off the other ${allOff.length}` : `Turn off all ${allOff.length}`}
           </button>
-          {outdoorCount > 0 && (
-            <p className="text-center text-xs text-text-dim">Driveway and backyard stay as they are.</p>
+          {keptCount > 0 && (
+            <p className="text-center text-xs text-text-dim">
+              Office Hue lights, driveway and backyard stay as they are.
+            </p>
           )}
         </div>
       )}
