@@ -1,14 +1,16 @@
 import { Home, Loader2 } from "lucide-react";
 import qrcode from "qrcode-generator";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useHa } from "../ha/HaProvider";
 import { normalizeHassUrl } from "../ha/connection";
-import { newPairingCode, pairingSupported, pairingUrl, pollLogin } from "../lib/pair";
+import { newPairingCode, pairingSupported, pairingUrl, pollLogin, type PairingCode } from "../lib/pair";
 
 const PAIR_POLL_MS = 2000;
 /** A code left on screen is swapped for a fresh one this often. */
 const PAIR_ROTATE_MS = 5 * 60_000;
+/** How long a rotated-out code is still accepted. */
+const PAIR_GRACE_MS = 2 * 60_000;
 
 function QrCode({ text }: { text: string }) {
   const { size, path } = useMemo(() => {
@@ -56,28 +58,54 @@ export function Login() {
     pairingSupported() && !approving ? newPairingCode() : null,
   );
 
+  const [pairError, setPairError] = useState<string | null>(null);
+  // The code that was on screen before the last rotation. Still polled for a
+  // while: a phone that scanned it just before the swap approves the old one.
+  const previousRef = useRef<{ code: PairingCode; until: number } | null>(null);
+
+  function rotatePairing() {
+    setPairing((current) => {
+      if (current) previousRef.current = { code: current, until: Date.now() + PAIR_GRACE_MS };
+      return newPairingCode();
+    });
+  }
+
   // Wait for a signed-in phone to approve the code on screen (lib/pair.ts).
   useEffect(() => {
     if (!pairing) return;
     let done = false;
     const poll = setInterval(async () => {
       if (done) return;
-      let creds;
-      try {
-        creds = await pollLogin(pairing);
-      } catch {
-        return; // relay unreachable; keep trying
-      }
-      if (!creds || done) return;
-      done = true;
-      try {
-        await login(creds.hassUrl, creds.token);
-      } catch {
-        // Error is surfaced via context; the code is spent either way.
-        setPairing(newPairingCode());
+      const prev = previousRef.current;
+      const codes = prev && prev.until > Date.now() ? [pairing, prev.code] : [pairing];
+      for (const code of codes) {
+        let creds;
+        try {
+          creds = await pollLogin(code);
+        } catch (err) {
+          // A failed fetch is the relay being unreachable (keep trying);
+          // anything else means a collected login that couldn't be opened.
+          console.warn("QR sign-in poll failed", err);
+          if (!(err instanceof TypeError)) {
+            setPairError(err instanceof Error ? err.message : String(err));
+            rotatePairing();
+          }
+          return;
+        }
+        if (!creds || done) continue;
+        done = true;
+        setPairError(null);
+        try {
+          await login(creds.hassUrl, creds.token);
+        } catch (err) {
+          // Error is surfaced via context; the code is spent either way.
+          console.warn("QR sign-in login failed", err);
+          rotatePairing();
+        }
+        return;
       }
     }, PAIR_POLL_MS);
-    const rotate = setTimeout(() => setPairing(newPairingCode()), PAIR_ROTATE_MS);
+    const rotate = setTimeout(rotatePairing, PAIR_ROTATE_MS);
     return () => {
       done = true;
       clearInterval(poll);
@@ -121,6 +149,11 @@ export function Login() {
               <p className="text-center text-xs text-text-dim">
                 Scan with a phone that's already signed in to this dashboard.
               </p>
+              {pairError && (
+                <p className="text-center text-xs text-danger">
+                  That sign-in didn't go through ({pairError}). Scan the new code to try again.
+                </p>
+              )}
             </div>
             <div className="my-5 flex items-center gap-3 text-[11px] text-text-dim">
               <div className="h-px flex-1 bg-border" />
