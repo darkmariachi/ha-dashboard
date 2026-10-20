@@ -1,4 +1,4 @@
-import { Cctv, Cpu, House, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Cctv, ChartColumn, Cpu, House, LayoutGrid, type LucideIcon } from "lucide-react";
 import { createElement, useEffect, useRef, useState } from "react";
 import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
@@ -29,6 +29,8 @@ import { weatherIcon, weatherLabel } from "../home/statusIcons";
 import { useWeatherForecast } from "../home/useWeatherForecast";
 import { WeatherBackground } from "../home/WeatherBackground";
 import { WhoIsHome } from "../home/WhoIsHome";
+import { LightsInsightCard } from "../insights/LightsInsightCard";
+import { PresenceInsightCard } from "../insights/PresenceInsightCard";
 
 /** The layout is drawn on a 960px-wide canvas — what an Android TV WebView
  * reports at 1080p (density 2) — and zoomed to fit anything else, so it's
@@ -190,11 +192,29 @@ function DevicesTab() {
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <SprinklersCard index={1} />
-          <GamingCard index={3} />
-          <YouTubeCard index={4} />
+          <YouTubeCard index={3} />
           {CURATED_COMPUTERS.map((c, i) => (
-            <ComputerCard key={c.key} computer={c} index={i + 5} />
+            <ComputerCard key={c.key} computer={c} index={i + 4} />
           ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** The tablet's Insights page (InsightsPage) in two columns. Mostly
+ * read-only, so the D-pad scrolls past it (useTvNav's scrollPage). */
+function InsightsTab() {
+  return (
+    <>
+      <PageTitle>Insights</PageTitle>
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <PresenceInsightCard />
+          <GamingCard index={2} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <LightsInsightCard index={1} />
         </div>
       </div>
     </>
@@ -206,6 +226,7 @@ const TABS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: "/tv/rooms", label: "Rooms", icon: LayoutGrid },
   { to: "/tv/cameras", label: "Cameras", icon: Cctv },
   { to: "/tv/devices", label: "Devices", icon: Cpu },
+  { to: "/tv/insights", label: "Insights", icon: ChartColumn },
 ];
 
 function TabRail() {
@@ -295,6 +316,7 @@ export function TvScreen() {
           <Route path="rooms" element={<RoomsTab />} />
           <Route path="cameras" element={<CamerasTab />} />
           <Route path="devices" element={<DevicesTab />} />
+          <Route path="insights" element={<InsightsTab />} />
         </Routes>
       </div>
     </div>
