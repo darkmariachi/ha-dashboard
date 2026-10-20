@@ -15,6 +15,7 @@ import { PhoneScreen } from "./components/phone/PhoneScreen";
 import { Sidebar } from "./components/Sidebar";
 import { SettingsPage } from "./components/SettingsPage";
 import { TvScreen } from "./components/tv/TvScreen";
+import { CaseScreen } from "./components/case/CaseScreen";
 
 /** Shown while a saved login reconnects on launch. Same navy as the PWA's
  * manifest background, so Android's launch splash fades straight into it. */
@@ -37,6 +38,7 @@ function App() {
   const isPhone = pathname.startsWith("/phone");
   const isTv = pathname.startsWith("/tv");
   const isPair = pathname.startsWith("/pair");
+  const isCase = pathname.startsWith("/case");
   // Once we've been connected, a drop (phone screen off, Wi-Fi to mobile
   // handoff, HA restart) shouldn't throw everyone back to the login form —
   // the library reconnects on its own, so keep the UI up with a banner.
@@ -79,8 +81,9 @@ function App() {
         </div>
       )}
 
-      {/* The phone and TV layouts have their own tabs instead of the drawer. */}
-      {!isPhone && !isTv && !isPair && (
+      {/* The phone and TV layouts have their own tabs instead of the drawer;
+          the case screen is display-only. */}
+      {!isPhone && !isTv && !isPair && !isCase && (
         <>
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -100,6 +103,7 @@ function App() {
           <Route path="/" element={<HomeScreen />} />
           <Route path="/phone/*" element={<PhoneScreen />} />
           <Route path="/tv/*" element={<TvScreen />} />
+          <Route path="/case" element={<CaseScreen />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/area/:areaSlug" element={<AreaPage />} />
@@ -111,7 +115,7 @@ function App() {
       {/* The loud door alarm is for the wall tablet; a phone away from home
           (or the TV mid-movie) shouldn't start blaring. The Doors tile still
           shows what's open. */}
-      {!isPhone && !isTv && !isPair && <DoorAlertMonitor />}
+      {!isPhone && !isTv && !isPair && !isCase && <DoorAlertMonitor />}
     </div>
   );
 }
