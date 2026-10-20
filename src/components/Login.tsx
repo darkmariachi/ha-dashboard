@@ -48,6 +48,10 @@ export function Login() {
   // A phone that scanned a code but isn't signed in itself lands here on
   // /pair; it needs the form, not a code of its own.
   const approving = pathname.startsWith("/pair");
+  // Chromium 149 on computerpi (the /case kiosk) segfaults on any
+  // <input type="password">, so there the token is a text field masked with
+  // CSS instead.
+  const maskWithCss = pathname.startsWith("/case");
   const [pairing, setPairing] = useState(() =>
     pairingSupported() && !approving ? newPairingCode() : null,
   );
@@ -150,7 +154,10 @@ export function Login() {
             </span>
             <input
               className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
-              type="password"
+              type={maskWithCss ? "text" : "password"}
+              autoComplete="off"
+              spellCheck={false}
+              style={maskWithCss ? { WebkitTextSecurity: "disc" } as React.CSSProperties : undefined}
               placeholder="Paste your token"
               value={token}
               onChange={(e) => setToken(e.target.value)}
