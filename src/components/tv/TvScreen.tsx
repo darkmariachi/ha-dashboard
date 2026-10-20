@@ -159,6 +159,12 @@ function RoomsTab() {
   );
 }
 
+/** Stills rather than live MJPEG on the Cameras tab: each live stream holds
+ * one of the WebView's 6 connections to Home Assistant open for good, so with
+ * six cameras the activity thumbnails and clips below never got one. OK on a
+ * camera still opens it live, fullscreen. */
+const CAMERA_SNAPSHOT_MS = 2_000;
+
 function CamerasTab() {
   const { entitiesWithArea } = useHa();
   return (
@@ -167,7 +173,11 @@ function CamerasTab() {
       <div className="grid grid-cols-3 gap-3">
         {CURATED_CAMERAS.map((cam, i) => (
           <div key={cam.entityId} className="rise" style={{ animationDelay: `${100 + i * 50}ms` }}>
-            <CameraCard ent={resolveCuratedCamera(entitiesWithArea, cam)} bare />
+            <CameraCard
+              ent={resolveCuratedCamera(entitiesWithArea, cam)}
+              bare
+              snapshotEveryMs={CAMERA_SNAPSHOT_MS}
+            />
           </div>
         ))}
       </div>
