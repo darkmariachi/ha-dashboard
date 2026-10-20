@@ -55,6 +55,7 @@ export function QuickActionToast({
         visible && !closing ? "opacity-100" : "opacity-0",
       )}
       style={{ transitionDuration: `${FADE_MS}ms` }}
+      data-tv-scope
     >
       <div className="absolute inset-0 bg-black/30" onClick={close} aria-hidden />
 
@@ -73,6 +74,7 @@ export function QuickActionToast({
         <p className="text-lg text-text-dim">{action.description}</p>
         <button
           onClick={close}
+          data-tv-close
           className="mt-2 rounded-full bg-chip px-6 py-3 text-base font-medium text-text transition-colors hover:bg-chip-hover"
         >
           Dismiss

@@ -14,6 +14,7 @@ import { PairPage } from "./components/PairPage";
 import { PhoneScreen } from "./components/phone/PhoneScreen";
 import { Sidebar } from "./components/Sidebar";
 import { SettingsPage } from "./components/SettingsPage";
+import { TvScreen } from "./components/tv/TvScreen";
 
 /** Shown while a saved login reconnects on launch. Same navy as the PWA's
  * manifest background, so Android's launch splash fades straight into it. */
@@ -34,6 +35,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const isPhone = pathname.startsWith("/phone");
+  const isTv = pathname.startsWith("/tv");
   const isPair = pathname.startsWith("/pair");
   // Once we've been connected, a drop (phone screen off, Wi-Fi to mobile
   // handoff, HA restart) shouldn't throw everyone back to the login form —
@@ -77,8 +79,8 @@ function App() {
         </div>
       )}
 
-      {/* The phone layout has its own bottom tab bar instead of the drawer. */}
-      {!isPhone && !isPair && (
+      {/* The phone and TV layouts have their own tabs instead of the drawer. */}
+      {!isPhone && !isTv && !isPair && (
         <>
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -97,6 +99,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeScreen />} />
           <Route path="/phone/*" element={<PhoneScreen />} />
+          <Route path="/tv/*" element={<TvScreen />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/area/:areaSlug" element={<AreaPage />} />
@@ -106,8 +109,9 @@ function App() {
       </main>
 
       {/* The loud door alarm is for the wall tablet; a phone away from home
-          shouldn't start blaring. The Doors tile still shows what's open. */}
-      {!isPhone && !isPair && <DoorAlertMonitor />}
+          (or the TV mid-movie) shouldn't start blaring. The Doors tile still
+          shows what's open. */}
+      {!isPhone && !isTv && !isPair && <DoorAlertMonitor />}
     </div>
   );
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same navy as the dashboard's own splash, so launch fades into it. -->
+    <color name="splash">#18213f</color>
+
+    <style name="Shell" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/splash</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>

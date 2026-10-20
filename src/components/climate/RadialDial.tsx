@@ -1,4 +1,4 @@
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
 import clsx from "clsx";
 
 // A 270° arc (like a classic Nest/thermostat dial) with a 90° gap centered
@@ -38,6 +38,8 @@ export function RadialDial({
   const shadowId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const draggingIndexRef = useRef<number | null>(null);
+  // Which handle the arrow keys move — Enter swaps it on a two-handle dial.
+  const [keyIndex, setKeyIndex] = useState(0);
 
   const cx = size / 2;
   const cy = size / 2;
@@ -114,6 +116,22 @@ export function RadialDial({
     draggingIndexRef.current = null;
   }
 
+  // Keyboard / TV remote: left and right nudge the active handle one step.
+  function handleKeyDown(e: React.KeyboardEvent<SVGSVGElement>) {
+    if (disabled) return;
+    const idx = Math.min(keyIndex, handles.length - 1);
+    if (e.key === "Enter" && handles.length > 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      setKeyIndex(idx === 0 ? 1 : 0);
+      return;
+    }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next = handles[idx].value + (e.key === "ArrowRight" ? step : -step);
+    commit(idx, ((clampNum(next, min, max) - min) / (max - min)) * SWEEP);
+  }
+
   const trackPath = describeArc(cx, cy, r, START_ANGLE, START_ANGLE + SWEEP);
 
   return (
@@ -131,6 +149,13 @@ export function RadialDial({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      role="slider"
+      tabIndex={disabled ? -1 : 0}
+      aria-label="Target temperature"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={handles[Math.min(keyIndex, handles.length - 1)].value}
+      onKeyDown={handleKeyDown}
     >
       <defs>
         <filter id={shadowId} x="-50%" y="-50%" width="200%" height="200%">
@@ -188,7 +213,7 @@ export function RadialDial({
             r={knobR}
             fill="var(--color-surface)"
             stroke={h.color}
-            strokeWidth={4}
+            strokeWidth={handles.length > 1 && i === keyIndex ? 6 : 4}
             filter={`url(#${shadowId})`}
           />
         );

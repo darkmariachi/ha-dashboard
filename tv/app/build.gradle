@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.rufogongora.homedashboard'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'io.github.rufogongora.homedashboard'
+        minSdk 26
+        // 34, not 36: from 36 the system swallows the remote's Back key for
+        // predictive back, and the shell needs it to ask the page first.
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+        buildConfigField 'String', 'DASHBOARD_URL', "\"${project.property('dashboardUrl')}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

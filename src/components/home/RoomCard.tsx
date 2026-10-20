@@ -10,7 +10,17 @@ import { ROOM_ILLUSTRATIONS } from "../illustrations/RoomIllustrations";
 import { IconToggleButton } from "./IconToggleButton";
 import { LightSheet } from "./LightSheet";
 
-export function RoomCard({ room, index }: { room: CuratedRoom; index: number }) {
+export function RoomCard({
+  room,
+  index,
+  titleLink = true,
+}: {
+  room: CuratedRoom;
+  index: number;
+  /** Link the room's name to its All Areas page. Off on the TV, where that
+   * page isn't built for the remote. */
+  titleLink?: boolean;
+}) {
   const { entities, callService } = useHa();
   const [lightsOpen, setLightsOpen] = useState(false);
   const color = roomColorFor(index);
@@ -41,12 +51,16 @@ export function RoomCard({ room, index }: { room: CuratedRoom; index: number }) 
       }}
     >
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <Link
-          to={`/area/${slugifyAreaName(room.name)}`}
-          className="w-fit text-[19px] font-semibold tracking-[-0.3px] text-text hover:underline"
-        >
-          {room.name}
-        </Link>
+        {titleLink ? (
+          <Link
+            to={`/area/${slugifyAreaName(room.name)}`}
+            className="w-fit text-[19px] font-semibold tracking-[-0.3px] text-text hover:underline"
+          >
+            {room.name}
+          </Link>
+        ) : (
+          <div className="text-[19px] font-semibold tracking-[-0.3px] text-text">{room.name}</div>
+        )}
         <div className="mt-0.5 flex items-center text-[13px] text-text-dim">
           {active ? (
             <>

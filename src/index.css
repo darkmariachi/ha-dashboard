@@ -174,3 +174,32 @@ input[type="range"]::-moz-range-thumb {
   filter: brightness(0.75) saturate(0.9);
   transition: opacity 1.2s ease;
 }
+
+/* TV layout (TvScreen): the remote's focus has to be obvious from the couch.
+ * Plain :focus rather than :focus-visible — there's no pointer on a TV, and
+ * focus moved by script (a pop-up closing) should show too. */
+.tv {
+  --tv-focus: #1b2440;
+}
+.tv.home-night {
+  --tv-focus: #ffffff;
+}
+.tv :focus {
+  outline: 3px solid var(--tv-focus);
+  outline-offset: 2px;
+  /* Keeps a focused card clear of the screen edge when it scrolls into view. */
+  scroll-margin: 28px;
+}
+/* Camera tiles sit straight on the (dark) weather photo, day or night, and
+ * their rounded frame clips anything drawn outside it — so a white ring,
+ * inset. */
+.tv [role="button"]:focus {
+  outline-color: #ffffff;
+  outline-offset: -3px;
+}
+.tv input[type="range"]:focus {
+  outline-offset: 6px;
+}
+.tv * {
+  scrollbar-width: none;
+}

@@ -126,6 +126,32 @@ know whether it's mattering to you day to day, and how your cameras are
 backed (e.g. go2rtc in front of UniFi Protect/RTSP sources works well for
 a WebRTC or HLS embed).
 
+## On the TV
+
+`/tv` is a layout for a 10-foot screen, driven entirely with a remote's
+D-pad: a tab rail (Home, Rooms, Cameras, Devices), arrows to move, OK to
+press, Back to close a pop-up or step out. It works in any browser with
+arrow keys, Enter and Escape, which is the easy way to try it.
+
+`tv/` is a small Android TV app for it — a fullscreen WebView that loads
+`/tv` from this container, so a normal dashboard deploy updates the TV too
+and the APK only needs reinstalling when the shell itself changes. To put
+it on an Nvidia Shield (needs the Android SDK and a JDK 17–24 on this PC):
+
+1. On the Shield: Settings → Device Preferences → About, press OK on
+   **Build** seven times, then Developer options → **Network debugging**.
+2. From `tv/`:
+
+   ```powershell
+   .\deploy.ps1 -Tv <shield-ip> -Login
+   ```
+
+   Accept the debugging prompt on the TV the first time (and run it again).
+   `-Login` asks for a long-lived access token and signs the TV in, so you
+   don't have to type one with the remote; leave it off for later
+   reinstalls. The dashboard address it loads is `dashboardUrl` in
+   `tv/gradle.properties` (or `-DashboardUrl`).
+
 ## 4. Customize
 
 **The Home screen** (rooms, toggles, cameras, which entities show up) is

@@ -7,3 +7,4 @@ dist-ssr
 *.log
 push/node_modules
 push-data
+tv

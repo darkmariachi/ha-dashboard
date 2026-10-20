@@ -357,7 +357,7 @@ function OnNowTile({ className, onOpen }: { className?: string; onOpen: () => vo
   );
 }
 
-export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone" }) {
+export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone" | "tv" }) {
   const { entities, callService } = useHa();
   const [climateOpen, setClimateOpen] = useState(false);
   const [powerOpen, setPowerOpen] = useState(false);
@@ -385,7 +385,9 @@ export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone"
       className={
         variant === "phone"
           ? "grid grid-cols-2 gap-3"
-          : "grid grid-cols-2 gap-4 lg:grid-cols-[1fr_1fr_1fr_1.25fr_1.5fr]"
+          : variant === "tv"
+            ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3"
+            : "grid grid-cols-2 gap-4 lg:grid-cols-[1fr_1fr_1fr_1.25fr_1.5fr]"
       }
     >
       {variant === "phone" ? (
@@ -397,6 +399,16 @@ export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone"
           <PowerTile onOpen={() => setPowerOpen(true)} />
           <ClimateTile onOpen={() => setClimateOpen(true)} />
           <DoorsTile className="col-span-2 min-h-0" onOpen={() => setDoorsOpen(true)} />
+          <SpotifyTile onOpen={() => setSpotifyOpen(true)} className="col-span-2" />
+        </>
+      ) : variant === "tv" ? (
+        // TV: the four glanceable tiles in a row, actions and music below.
+        <>
+          <PowerTile onOpen={() => setPowerOpen(true)} />
+          <ClimateTile onOpen={() => setClimateOpen(true)} />
+          <DoorsTile onOpen={() => setDoorsOpen(true)} />
+          <OnNowTile onOpen={() => setOnNowOpen(true)} />
+          <QuickActionsTile onRun={runAction} className="col-span-2" />
           <SpotifyTile onOpen={() => setSpotifyOpen(true)} className="col-span-2" />
         </>
       ) : (

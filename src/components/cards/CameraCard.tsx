@@ -135,6 +135,13 @@ export function CameraCard({
           imgSrc && !dead && "cursor-pointer",
         )}
         onClick={openFullscreen}
+        // Reachable with a keyboard / TV remote, not just a tap.
+        role="button"
+        tabIndex={imgSrc && !dead ? 0 : -1}
+        aria-label={`${ent.friendlyName}, open fullscreen`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.defaultPrevented) openFullscreen();
+        }}
       >
         {imgSrc && !dead ? (
           <img
@@ -196,6 +203,7 @@ export function CameraCard({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
           onClick={closeFullscreen}
+          data-tv-scope
         >
           <img
             src={fullSrc ?? imgSrc}

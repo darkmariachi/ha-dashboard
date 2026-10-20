@@ -81,7 +81,7 @@ export function SpotifySearchModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" data-tv-scope>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
 
       <div
