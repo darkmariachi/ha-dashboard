@@ -16,7 +16,8 @@ export type RoomIllustrationKey =
   | "bedroom"
   | "driveway"
   | "diningRoom"
-  | "backyard";
+  | "backyard"
+  | "attic";
 
 export interface CuratedToggle {
   entityId: string;
@@ -103,6 +104,8 @@ export const CURATED_ROOMS: CuratedRoom[] = [
     external: true,
     toggles: [
       { entityId: "switch.main_entrance_lights_switch", label: "Entrance", icon: Lightbulb },
+      { entityId: "light.permanent_lights_pro", label: "Permanent", icon: Sparkles },
+      { entityId: "light.rgbic_path_lights", label: "Path", icon: Lightbulb },
     ],
   },
   {
@@ -119,6 +122,7 @@ export const CURATED_ROOMS: CuratedRoom[] = [
     external: true,
     toggles: [
       { entityId: "switch.backyard_door_light", label: "Door Light", icon: Lightbulb },
+      { entityId: "light.outdoor_deck_lights", label: "Deck", icon: Lightbulb },
       {
         entityId: "switch.tp_link_power_strip_8772_bar_lights",
         label: "Bar Lights",
@@ -129,6 +133,17 @@ export const CURATED_ROOMS: CuratedRoom[] = [
         label: "Bar Fridge",
         icon: Refrigerator,
       },
+    ],
+  },
+  {
+    key: "attic",
+    name: "Attic",
+    illustration: "attic",
+    toggles: [
+      { entityId: "switch.attic_light", label: "Lights", icon: Lightbulb },
+      { entityId: "light.strip_light", label: "Strip", icon: Sparkles },
+      { entityId: "light.cob_strip_light", label: "COB", icon: Sparkles },
+      { entityId: "light.attic_gaming_pixel_light", label: "Pixel", icon: Sparkles },
     ],
   },
 ];

@@ -34,7 +34,8 @@ export function RoomCard({
   const active = onCount > 0;
 
   function toggle(entityId: string) {
-    callService("switch", "toggle", {}, { entity_id: entityId }).catch(() => {});
+    // The entity's own domain, so light.* toggles (e.g. Govee) work alongside switch.*.
+    callService(entityId.split(".")[0], "toggle", {}, { entity_id: entityId }).catch(() => {});
   }
 
   return (

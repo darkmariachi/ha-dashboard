@@ -1,4 +1,4 @@
-import { Bed, Car, ChefHat, Sofa, Trees, UtensilsCrossed, type LucideIcon, Monitor } from "lucide-react";
+import { Bed, Car, ChefHat, Gamepad2, Sofa, Trees, UtensilsCrossed, type LucideIcon, Monitor } from "lucide-react";
 import type { RoomIllustrationKey } from "../../config/curatedHome";
 
 /**
@@ -15,4 +15,5 @@ export const ROOM_ILLUSTRATIONS: Record<RoomIllustrationKey, LucideIcon> = {
   driveway: Car,
   diningRoom: UtensilsCrossed,
   backyard: Trees,
+  attic: Gamepad2,
 };
