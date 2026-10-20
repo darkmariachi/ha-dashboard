@@ -44,15 +44,24 @@ function importKey(code: PairingCode) {
   return crypto.subtle.importKey("raw", fromBase64Url(code.key), "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
+/** The relay couldn't be reached or refused the request (as opposed to a
+ * login that arrived but couldn't be opened). */
+export class RelayError extends Error {}
+
 async function post<T>(path: string, data: unknown): Promise<T> {
-  const res = await fetch(`/api/push/pair/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/push/pair/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    throw new RelayError(err instanceof Error ? err.message : String(err));
+  }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(err.error ?? `Request failed (${res.status})`);
+    throw new RelayError(err.error ?? `Request failed (${res.status})`);
   }
   return res.json() as Promise<T>;
 }

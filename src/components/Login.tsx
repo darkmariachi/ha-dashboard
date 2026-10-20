@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useHa } from "../ha/HaProvider";
 import { normalizeHassUrl } from "../ha/connection";
-import { newPairingCode, pairingSupported, pairingUrl, pollLogin, type PairingCode } from "../lib/pair";
+import { newPairingCode, pairingSupported, pairingUrl, pollLogin, RelayError, type PairingCode } from "../lib/pair";
 
 const PAIR_POLL_MS = 2000;
 /** A code left on screen is swapped for a fresh one this often. */
@@ -83,10 +83,10 @@ export function Login() {
         try {
           creds = await pollLogin(code);
         } catch (err) {
-          // A failed fetch is the relay being unreachable (keep trying);
-          // anything else means a collected login that couldn't be opened.
+          // The relay being unreachable just means keep trying; anything
+          // else is a collected login that couldn't be opened.
           console.warn("QR sign-in poll failed", err);
-          if (!(err instanceof TypeError)) {
+          if (!(err instanceof RelayError)) {
             setPairError(err instanceof Error ? err.message : String(err));
             rotatePairing();
           }
