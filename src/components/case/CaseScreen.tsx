@@ -12,6 +12,11 @@ const WINDOW_MIN = 30;
 
 const ONLINE = "#2fae7e";
 
+/** Stills rather than live MJPEG: this page runs for days, and a live stream
+ * that dies mid-way (HA restart, network blip) leaves a black tile without
+ * ever firing an error. A fresh still each tick heals itself. */
+const CAMERA_SNAPSHOT_MS = 2_000;
+
 interface Stat {
   label: string;
   entityId: string;
@@ -35,8 +40,15 @@ const BOOT_ENTITY = "sensor.apollo_lastboot";
 function reading(e: HassEntity | undefined) {
   if (!e || e.state === "unavailable" || e.state === "unknown") return null;
   const v = parseFloat(e.state);
-  // HASS.Agent sends 0 for a GPU temperature it can't read.
   return Number.isFinite(v) ? v : null;
+}
+
+/** HASS.Agent sends 0 °C for a GPU temperature it can't read, which HA
+ * shows as 32 °F. */
+function readsTemp(e: HassEntity | undefined) {
+  const v = reading(e);
+  if (v === null) return false;
+  return e!.attributes.unit_of_measurement === "°F" ? v !== 32 : v !== 0;
 }
 
 type Point = { t: number; v: number };
@@ -228,8 +240,8 @@ export function CaseScreen() {
   // Same rule as ComputerCard: HASS.Agent reporting, and the ping not down.
   const session = entities[ONLINE_ENTITY]?.state;
   const online = !!session && session !== "unavailable" && session !== "unknown" && entities[PING_ENTITY]?.state !== "off";
-  // Drop GPU temp while HASS.Agent isn't reading one (it reports 0).
-  const stats = STATS.filter((s) => !s.temp || (reading(entities[s.entityId]) ?? 0) > 0);
+  // Drop GPU temp while HASS.Agent isn't reading one.
+  const stats = STATS.filter((s) => !s.temp || readsTemp(entities[s.entityId]));
   const cameras = CURATED_CAMERAS.filter((c) => c.sidebar);
 
   return (
@@ -242,7 +254,13 @@ export function CaseScreen() {
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         {cameras.map((cam) => (
-          <CameraCard key={cam.entityId} ent={resolveCuratedCamera(entitiesWithArea, cam)} bare fill />
+          <CameraCard
+            key={cam.entityId}
+            ent={resolveCuratedCamera(entitiesWithArea, cam)}
+            bare
+            fill
+            snapshotEveryMs={CAMERA_SNAPSHOT_MS}
+          />
         ))}
       </div>
     </div>
