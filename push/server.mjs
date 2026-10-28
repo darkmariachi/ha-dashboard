@@ -139,11 +139,11 @@ async function deliver(endpoints, payload) {
         sent++;
       } catch (err) {
         if (err.statusCode === 404 || err.statusCode === 410) {
-          log("removing expired subscription", entry.label);
+          log("removing expired subscription", entry.label, new URL(endpoint).host, err.statusCode, err.body?.slice(0, 200));
           delete subs[endpoint];
           dirty = true;
         } else {
-          log("push failed", entry.label, err.statusCode ?? err.message);
+          log("push failed", entry.label, err.statusCode ?? err.message, err.body?.slice(0, 200));
         }
       }
     }),
