@@ -159,6 +159,11 @@ export const CURATED_CAMERAS: CuratedCamera[] = [
 
 export const CURATED_CLIMATE_ENTITY = "climate.entryway";
 
+/** Where the AC goes while nobody's home. HA's "Nobody home - thermostat
+ * reminder" automation (automations.yaml on skylab) pushes a reminder when
+ * it's set cooler than this; the notification opens /phone?run=away_temp. */
+export const AWAY_COOL_TEMP = 78;
+
 /** The Rachio controller. Zones and schedules are switches (on = running). */
 export const CURATED_SPRINKLERS = {
   zones: [
