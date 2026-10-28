@@ -63,9 +63,14 @@ export async function enablePush(person: string, label: string) {
   }
   const { publicKey } = (await (await fetch("/api/push/vapid")).json()) as { publicKey: string };
   const reg = await navigator.serviceWorker.ready;
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) }));
+  // Always start fresh: a leftover subscription can be dead (restored from
+  // an old phone, or made with a different key), and reusing it means the
+  // push service drops it on the first send, every time.
+  await (await reg.pushManager.getSubscription())?.unsubscribe().catch(() => {});
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
   await post("subscribe", { subscription: sub.toJSON(), token: token(), person, label });
   return sub;
 }
