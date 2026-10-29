@@ -89,7 +89,7 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
     track.set(entityId, { state: next, since: at });
     if (!prev) return; // first sighting: no way to tell when it got here
 
-    const list = (data.sessions[entityId] ??= []);
+    const list = data.sessions[entityId] ?? [];
     const last = list[list.length - 1];
     if (next === "away") {
       if (last && last.end === null) {
@@ -110,6 +110,7 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
     const person = live ? personOf(entityId) : undefined;
     const announce = person?.notify && !personHereElsewhere(person, entityId) && at - lastLeft(person) > RENOTIFY_GAP_MS;
     list.push({ start: at, end: null });
+    data.sessions[entityId] = list;
     save();
     if (announce) {
       log("visitor arrived", person.name);
@@ -124,7 +125,9 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
   async function backfill(entityIds) {
     if (!entityIds.length) return;
     const from = new Date(Date.now() - BACKFILL_MS).toISOString();
-    const url = `${haUrl}/api/history/period/${from}?filter_entity_id=${entityIds.join(",")}&minimal_response&no_attributes`;
+    // Without end_time HA returns just one day.
+    const to = encodeURIComponent(new Date().toISOString());
+    const url = `${haUrl}/api/history/period/${from}?end_time=${to}&filter_entity_id=${entityIds.join(",")}&minimal_response&no_attributes`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`history ${res.status}`);
     const history = await res.json();
