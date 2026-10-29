@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Bell, BellOff, Loader2, Smartphone, Trash2, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
@@ -72,6 +73,9 @@ export function VisitorsPanel() {
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [naming, setNaming] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  // The "new device on the Wi-Fi" push links to ?device=<entity_id>.
+  const [params, setParams] = useSearchParams();
+  const linkedDevice = params.get("device");
 
   const refresh = useCallback(
     () =>
@@ -89,6 +93,12 @@ export function VisitorsPanel() {
     const t = setInterval(refresh, 60_000);
     return () => clearInterval(t);
   }, [refresh]);
+
+  useEffect(() => {
+    if (!log || !linkedDevice) return;
+    setNaming(linkedDevice);
+    setParams({}, { replace: true });
+  }, [log, linkedDevice, setParams]);
 
   const isHere = useCallback((id: string) => entities[id]?.state === "home", [entities]);
 

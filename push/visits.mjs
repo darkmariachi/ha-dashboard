@@ -10,6 +10,10 @@
 // skipped. Devices that never leave (plugs, switches) never "arrive", so
 // they never show up.
 //
+// A device HA has never seen before (its tracker entity was just created)
+// gets a "new device on the Wi-Fi" alert through `notifyNewDevice`, linking
+// to the tab's naming sheet.
+//
 // An away spell shorter than MIN_AWAY doesn't count: the visit carries on.
 // That smooths over Wi-Fi blips and the burst of state changes an HA
 // restart causes.
@@ -21,6 +25,9 @@ const KEEP_MS = 400 * 24 * 3_600_000;
 const BACKFILL_MS = 10 * 24 * 3_600_000;
 /** Don't announce an arrival if they were here this recently. */
 const RENOTIFY_GAP_MS = 30 * 60_000;
+/** A tracker created this recently is a device HA has never seen. (An
+ * integration reload also re-adds every entity, but those are old.) */
+const NEW_ENTITY_MS = 15 * 60_000;
 
 /**
  * Stored as JSON:
@@ -29,7 +36,7 @@ const RENOTIFY_GAP_MS = 30 * 60_000;
  *   names:    { entityId: friendly name }   — for naming new devices
  *   sessions: { entityId: [{ start, end }] } — ms, end null while there
  */
-export async function startVisitLog({ haUrl, token, file, notify, log }) {
+export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevice, log }) {
   let data = { people: [], hidden: [], names: {}, sessions: {} };
   try {
     data = { ...data, ...JSON.parse(await readFile(file, "utf8")) };
@@ -186,6 +193,40 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
     let statesId = 0;
     let ready = false;
     const queued = [];
+    /** id -> resolve, for one-off requests. */
+    const pending = new Map();
+
+    function request(msg) {
+      const id = nextId++;
+      ws.send(JSON.stringify({ ...msg, id }));
+      return new Promise((resolve) => {
+        pending.set(id, resolve);
+        setTimeout(() => pending.delete(id) && resolve(null), 10_000);
+      });
+    }
+
+    /** A tracker that just appeared: if HA only now created it, this is
+     * the device's first time on the Wi-Fi — log the visit and say so. */
+    async function maybeNewDevice(s) {
+      if (!s || s.state !== "home" || !isRoamer(s) || household.has(s.entity_id)) return;
+      if (data.sessions[s.entity_id] || data.hidden.includes(s.entity_id)) return;
+      const entry = await request({ type: "config/entity_registry/get", entity_id: s.entity_id });
+      const raw = entry?.success ? entry.result?.created_at : null;
+      const created = typeof raw === "number" ? (raw < 1e12 ? raw * 1000 : raw) : Date.parse(raw ?? "");
+      if (!(Date.now() - created < NEW_ENTITY_MS)) return;
+      const at = Date.parse(s.last_changed);
+      // Pretend it was away, so this counts as an arrival.
+      track.set(s.entity_id, { state: "away", since: 0 });
+      update(s.entity_id, "home", at, false);
+      const name = data.names[s.entity_id] ?? deviceName(s.attributes ?? {});
+      log("new device", s.entity_id, name);
+      notifyNewDevice?.({
+        title: "New device on the Wi-Fi",
+        message: `${name} just joined for the first time. Tap to name it or hide it.`,
+        url: `/phone/visitors?device=${encodeURIComponent(s.entity_id)}`,
+        tag: `new-device-${s.entity_id}`,
+      }).catch((err) => log("new device notify failed", err.message));
+    }
 
     function onState(s) {
       if (!s) return;
@@ -218,6 +259,9 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
         ws.send(JSON.stringify({ id: statesId, type: "get_states" }));
       } else if (msg.type === "auth_invalid") {
         log("visit log: HA rejected HA_TOKEN");
+      } else if (msg.type === "result" && pending.has(msg.id)) {
+        pending.get(msg.id)(msg);
+        pending.delete(msg.id);
       } else if (msg.type === "result" && msg.id === statesId && msg.success) {
         household = new Set(msg.result.filter((s) => s.entity_id.startsWith("person.")).flatMap((s) => s.attributes?.device_trackers ?? []));
         const roamers = msg.result.filter(isRoamer);
@@ -232,8 +276,9 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
         log("visit log connected,", roamers.length, "Wi-Fi trackers,", data.people.length, "visitors");
       } else if (msg.type === "event" && msg.event?.event_type === "state_changed") {
         const s = msg.event.data.new_state;
-        if (ready) onState(s);
-        else queued.push(s);
+        if (!ready) return queued.push(s);
+        onState(s);
+        if (!msg.event.data.old_state) maybeNewDevice(s).catch((err) => log("new device check failed", err.message));
       }
     });
 

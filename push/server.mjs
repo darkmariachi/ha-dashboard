@@ -45,6 +45,8 @@ const {
   DATA_FILE = "/data/subscriptions.json",
   // Visitors tab (visits.mjs). Uses HA_TOKEN too.
   VISITS_FILE = "/data/visitors.json",
+  // Who gets "new device on the Wi-Fi" alerts (subscription `person`).
+  NEW_DEVICE_PEOPLE = "rodolfo",
   // Door-open alerts (doors.mjs). Needs a long-lived HA access token.
   HA_TOKEN,
   DOOR_SENSORS = "binary_sensor.front_door_sensor=Front Door,binary_sensor.garage_door_sensor=Garage Door,binary_sensor.print_room_garage_door=Print Room Garage Door",
@@ -268,6 +270,7 @@ const visits = HA_TOKEN
       token: HA_TOKEN,
       file: VISITS_FILE,
       notify: (payload) => deliver(Object.keys(subs), payload),
+      notifyNewDevice: (payload) => deliver(targetsFor(NEW_DEVICE_PEOPLE.split(",").map((p) => p.trim()).filter(Boolean)), payload),
       log,
     })
   : null;
