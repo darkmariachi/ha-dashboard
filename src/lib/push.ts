@@ -26,7 +26,7 @@ function urlBase64ToUint8Array(base64: string) {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
-async function post(path: string, data: unknown) {
+export async function post(path: string, data: unknown) {
   const res = await fetch(`/api/push/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -39,7 +39,7 @@ async function post(path: string, data: unknown) {
   return res.json();
 }
 
-function token() {
+export function token() {
   const creds = loadCredentials();
   if (!creds) throw new Error("Sign in first.");
   return creds.token;

@@ -1,4 +1,4 @@
-import { Cctv, ChartColumn, Cpu, House, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Cctv, ChartColumn, Cpu, House, LayoutGrid, Users, type LucideIcon } from "lucide-react";
 import { createElement } from "react";
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import clsx from "clsx";
@@ -31,6 +31,7 @@ import { weatherIcon, weatherLabel } from "../home/statusIcons";
 import { useWeatherForecast } from "../home/useWeatherForecast";
 import { WeatherBackground } from "../home/WeatherBackground";
 import { WhoIsHome } from "../home/WhoIsHome";
+import { VisitorsPanel } from "../visitors/VisitorsPanel";
 
 /** How often the phone's camera stills refresh (live stream on tap). */
 const CAMERA_SNAPSHOT_MS = 10_000;
@@ -173,6 +174,15 @@ function DevicesTab() {
   );
 }
 
+function VisitorsTab() {
+  return (
+    <>
+      <PageTitle>Visitors</PageTitle>
+      <VisitorsPanel />
+    </>
+  );
+}
+
 function InsightsTab() {
   return (
     <>
@@ -187,6 +197,7 @@ const TABS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: "/phone/rooms", label: "Rooms", icon: LayoutGrid },
   { to: "/phone/cameras", label: "Cameras", icon: Cctv },
   { to: "/phone/devices", label: "Devices", icon: Cpu },
+  { to: "/phone/visitors", label: "Visitors", icon: Users },
   { to: "/phone/insights", label: "Insights", icon: ChartColumn },
 ];
 
@@ -253,6 +264,7 @@ export function PhoneScreen() {
           <Route path="rooms" element={<RoomsTab />} />
           <Route path="cameras" element={<CamerasTab />} />
           <Route path="devices" element={<DevicesTab />} />
+          <Route path="visitors" element={<VisitorsTab />} />
           <Route path="insights" element={<InsightsTab />} />
         </Routes>
       </div>
