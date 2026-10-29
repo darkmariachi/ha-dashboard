@@ -166,6 +166,15 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
     log("visit log backfilled", entityIds.length, "trackers,", added, "new visits");
   }
 
+  // UniFi's friendly_name repeats the hostname ("iPad iPad"), and is just
+  // the entity id for clients that send none.
+  function deviceName(attrs) {
+    if (attrs.host_name) return attrs.host_name;
+    const tail = (attrs.mac ?? "").slice(-5).toUpperCase();
+    if (attrs.oui && attrs.oui !== "Private") return `${attrs.oui} device ${tail}`.trim();
+    return tail ? `Unnamed device ${tail}` : "Unnamed device";
+  }
+
   function isRoamer(s) {
     return s.entity_id.startsWith("device_tracker.") && s.attributes?.source_type === "router";
   }
@@ -185,8 +194,9 @@ export async function startVisitLog({ haUrl, token, file, notify, log }) {
         return;
       }
       if (!isRoamer(s)) return;
-      if (s.attributes?.friendly_name && data.names[s.entity_id] !== s.attributes.friendly_name) {
-        data.names[s.entity_id] = s.attributes.friendly_name;
+      const name = deviceName(s.attributes ?? {});
+      if (data.names[s.entity_id] !== name) {
+        data.names[s.entity_id] = name;
         save();
       }
       update(s.entity_id, s.state, Date.parse(s.last_changed), true);

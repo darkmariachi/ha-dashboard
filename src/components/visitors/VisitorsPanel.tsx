@@ -21,8 +21,10 @@ import { Sheet } from "../home/Sheet";
 
 const HOME_GREEN = "#3ee08f";
 const ACCENT = "#4f79c9";
-/** New devices only list ones that came by this recently. */
+/** New devices only list ones that came by this recently... */
 const NEW_DEVICE_DAYS = 30;
+/** ...and not ones that have stayed this long: those live here. */
+const RESIDENT_DAYS = 2;
 const DAY_MS = 86_400_000;
 
 const INPUT =
@@ -109,6 +111,7 @@ export function VisitorsPanel() {
     return Object.entries(log.sessions)
       .filter(([id, list]) => !named.has(id) && !household.has(id) && !log.hidden.includes(id) && list.some((s) => (s.end ?? Infinity) >= cutoff))
       .map(([id]) => ({ id, name: log.names[id] ?? id, visits: visitsOf([id], log.sessions), here: isHere(id) }))
+      .filter((d) => !(d.here && d.visits[0].end === null && now.getTime() - d.visits[0].start > RESIDENT_DAYS * DAY_MS))
       .sort((a, b) => Number(b.here) - Number(a.here) || b.visits[0].start - a.visits[0].start);
   }, [log, household, isHere, now]);
 
