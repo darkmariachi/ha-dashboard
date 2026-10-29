@@ -226,6 +226,7 @@ export function VisitorsPanel() {
         <NameDeviceSheet
           entityId={naming}
           log={log}
+          now={now}
           onClose={() => setNaming(null)}
           onDone={(personId) => {
             setNaming(null);
@@ -264,6 +265,44 @@ function PersonRow({
   );
 }
 
+/** Visits grouped by the day they started, newest first. */
+function VisitHistory({ visits, now, limit }: { visits: Session[]; now: Date; limit: number }) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? visits : visits.slice(0, limit);
+  const days: { label: string; visits: Session[] }[] = [];
+  for (const v of shown) {
+    const label = new Date(v.start).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    if (days[days.length - 1]?.label === label) days[days.length - 1].visits.push(v);
+    else days.push({ label, visits: [v] });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {days.length === 0 && <div className="rounded-2xl bg-chip px-4 py-3 text-sm text-text-dim">Nothing recorded yet.</div>}
+      {days.map((d) => (
+        <div key={d.label}>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-dim">{d.label}</div>
+          <div className="flex flex-col gap-1 rounded-2xl bg-chip px-4 py-2.5">
+            {d.visits.map((v) => (
+              <div key={v.start} className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-text">
+                  {clock(v.start)} – {v.end === null ? <span style={{ color: HOME_GREEN }}>now</span> : clock(v.end)}
+                </span>
+                <span className="text-text-dim">{duration((v.end ?? now.getTime()) - v.start)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {visits.length > shown.length && (
+        <button onClick={() => setShowAll(true)} className="text-sm font-semibold" style={{ color: ACCENT }}>
+          Show all {visits.length} visits
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** A visitor's history, grouped by day, plus their settings. */
 function PersonSheet({
   person,
@@ -283,20 +322,10 @@ function PersonSheet({
   const [name, setName] = useState(person.name);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const visits = visitsOf(person.devices, log.sessions);
   const here = person.devices.some(isHere);
   const month = visits.filter((v) => (v.end ?? now.getTime()) >= now.getTime() - 30 * DAY_MS);
   const monthTime = month.reduce((sum, v) => sum + ((v.end ?? now.getTime()) - v.start), 0);
-  const shown = showAll ? visits : visits.slice(0, 20);
-
-  // Group by the day each visit started.
-  const days: { label: string; visits: Session[] }[] = [];
-  for (const v of shown) {
-    const label = new Date(v.start).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-    if (days[days.length - 1]?.label === label) days[days.length - 1].visits.push(v);
-    else days.push({ label, visits: [v] });
-  }
 
   function save(changes: Partial<Visitor>) {
     setBusy(true);
@@ -316,29 +345,7 @@ function PersonSheet({
       }
       onClose={onClose}
     >
-      <div className="flex flex-col gap-3">
-        {days.length === 0 && <div className="rounded-2xl bg-chip px-4 py-3 text-sm text-text-dim">Nothing recorded yet.</div>}
-        {days.map((d) => (
-          <div key={d.label}>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-dim">{d.label}</div>
-            <div className="flex flex-col gap-1 rounded-2xl bg-chip px-4 py-2.5">
-              {d.visits.map((v) => (
-                <div key={v.start} className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="text-text">
-                    {clock(v.start)} – {v.end === null ? <span style={{ color: HOME_GREEN }}>now</span> : clock(v.end)}
-                  </span>
-                  <span className="text-text-dim">{duration((v.end ?? now.getTime()) - v.start)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {visits.length > shown.length && (
-          <button onClick={() => setShowAll(true)} className="text-sm font-semibold" style={{ color: ACCENT }}>
-            Show all {visits.length} visits
-          </button>
-        )}
-      </div>
+      <VisitHistory visits={visits} now={now} limit={20} />
 
       <div className="flex flex-col gap-3 border-t border-border pt-4">
         <label className="flex flex-col gap-1.5">
@@ -399,11 +406,13 @@ function PersonSheet({
 function NameDeviceSheet({
   entityId,
   log,
+  now,
   onClose,
   onDone,
 }: {
   entityId: string;
   log: VisitLog;
+  now: Date;
   onClose: () => void;
   onDone: (personId: string | null) => void;
 }) {
@@ -428,8 +437,10 @@ function NameDeviceSheet({
 
   return (
     <Sheet title="Whose phone is this?" subtitle={`${deviceName} · ${visits.length} ${visits.length === 1 ? "visit" : "visits"}`} onClose={onClose}>
-      <div className="flex flex-col gap-2">
-        <input className={INPUT} placeholder="Name" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} />
+      <VisitHistory visits={visits} now={now} limit={8} />
+
+      <div className="flex flex-col gap-2 border-t border-border pt-4">
+        <input className={INPUT} placeholder="Name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
         <button
           onClick={() => run(() => saveVisitor({ name: name.trim(), devices: [entityId], notify: false }).then((p) => p.id))}
           disabled={busy || !name.trim()}
