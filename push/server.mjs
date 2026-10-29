@@ -11,6 +11,10 @@
 //   POST /send           (x-push-secret) { title, message, url?, tag?, people? }
 //   POST /pair/complete  { id, token, blob }
 //   POST /pair/poll      { id } -> { blob | null }
+//   POST /visitors/list  { token } -> visit log (visits.mjs)
+//   POST /visitors/person { token, person: { id?, name, devices, notify } }
+//   POST /visitors/delete { token, id }
+//   POST /visitors/hide   { token, entityId, hidden }
 //   GET  /health
 //
 // With HA_TOKEN set it also pushes alerts on its own: doors left open
@@ -29,6 +33,7 @@ import { timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { parseDoors, startDoorWatcher } from "./doors.mjs";
 import { parseGroups, startReachabilityWatcher } from "./reachability.mjs";
+import { startVisitLog } from "./visits.mjs";
 
 const {
   PORT = "8082",
@@ -38,6 +43,8 @@ const {
   VAPID_PRIVATE_KEY,
   VAPID_SUBJECT = "mailto:admin@localhost",
   DATA_FILE = "/data/subscriptions.json",
+  // Visitors tab (visits.mjs). Uses HA_TOKEN too.
+  VISITS_FILE = "/data/visitors.json",
   // Door-open alerts (doors.mjs). Needs a long-lived HA access token.
   HA_TOKEN,
   DOOR_SENSORS = "binary_sensor.front_door_sensor=Front Door,binary_sensor.garage_door_sensor=Garage Door,binary_sensor.print_room_garage_door=Print Room Garage Door",
@@ -237,12 +244,33 @@ const server = createServer(async (req, res) => {
       return reply(res, 200, { sent, targets: targets.length });
     }
 
+    if (req.method === "POST" && path.startsWith("/visitors/")) {
+      if (!visits) return reply(res, 503, { error: "visit log needs HA_TOKEN" });
+      const { token, person, id, entityId, hidden } = await body(req);
+      if (!(await validHaToken(token))) return reply(res, 401, { error: "invalid Home Assistant token" });
+      if (path === "/visitors/list") return reply(res, 200, visits.list());
+      if (path === "/visitors/person") return reply(res, 200, visits.savePerson(person ?? {}));
+      if (path === "/visitors/delete") return reply(res, 200, { ok: true, deleted: visits.deletePerson(id) });
+      if (path === "/visitors/hide") return reply(res, 200, { ok: true, hidden: visits.setHidden(entityId, hidden === true) });
+    }
+
     reply(res, 404, { error: "not found" });
   } catch (err) {
     log("error", err.message);
     reply(res, 400, { error: "bad request" });
   }
 });
+
+/** The Visitors tab's log (visits.mjs); null without HA_TOKEN. */
+const visits = HA_TOKEN
+  ? await startVisitLog({
+      haUrl: HA_URL,
+      token: HA_TOKEN,
+      file: VISITS_FILE,
+      notify: (payload) => deliver(Object.keys(subs), payload),
+      log,
+    })
+  : null;
 
 server.listen(Number(PORT), () => log(`push service on :${PORT}, ${Object.keys(subs).length} subscriptions`));
 
