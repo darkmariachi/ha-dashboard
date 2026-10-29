@@ -33,6 +33,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "Home", {
       body: data.message || "",
       icon: "/icon-192.png",
+      // Status-bar icon on Android: white on transparent, or the browser's shows.
+      badge: "/badge-96.png",
       tag: data.tag || undefined,
       renotify: Boolean(data.tag),
       data: { url: data.url || "/phone" },
