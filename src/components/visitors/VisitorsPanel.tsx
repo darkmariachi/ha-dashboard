@@ -108,7 +108,7 @@ export function VisitorsPanel() {
     const cutoff = now.getTime() - NEW_DEVICE_DAYS * DAY_MS;
     return Object.entries(log.sessions)
       .filter(([id, list]) => !named.has(id) && !household.has(id) && !log.hidden.includes(id) && list.some((s) => (s.end ?? Infinity) >= cutoff))
-      .map(([id, list]) => ({ id, name: log.names[id] ?? id, visits: visitsOf([id], log.sessions), here: isHere(id) }))
+      .map(([id]) => ({ id, name: log.names[id] ?? id, visits: visitsOf([id], log.sessions), here: isHere(id) }))
       .sort((a, b) => Number(b.here) - Number(a.here) || b.visits[0].start - a.visits[0].start);
   }, [log, household, isHere, now]);
 
