@@ -1,7 +1,8 @@
-import { createElement, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import clsx from "clsx";
 import { DoorClosed, DoorOpen, Fan, Power, SunDim, Thermometer, Zap, type LucideIcon } from "lucide-react";
 import {
+  CURATED_CAMERAS,
   CURATED_CLIMATE_ENTITY,
   CURATED_DOOR_SENSORS,
   CURATED_ENERGY,
@@ -13,9 +14,11 @@ import {
   type QuickAction,
 } from "../../config/curatedHome";
 import { useHa } from "../../ha/HaProvider";
+import { resolveCuratedCamera } from "../../lib/entityHelpers";
 import { roomColorFor, tintedGlass } from "../../lib/roomPalette";
 import { useNow } from "../../lib/useNow";
 import { isNightFor } from "../../lib/weatherTheme";
+import { CameraCard } from "../cards/CameraCard";
 import { ClimateControlModal } from "../climate/ClimateControlModal";
 import { ROOM_ILLUSTRATIONS } from "../illustrations/RoomIllustrations";
 import { DoorsModal } from "../home/DoorsModal";
@@ -29,6 +32,11 @@ import { useWeatherForecast } from "../home/useWeatherForecast";
 import { WeatherBackground } from "../home/WeatherBackground";
 
 const HOME_GREEN = "#3ee08f";
+/** Untouched this long, the wall switches to the camera screensaver. */
+const IDLE_MS = 2 * 60_000;
+/** Stills, not live streams: six MJPEG streams are too much for the Pi on its
+ * weak power supply, and a still that fails just tries again next tick. */
+const SAVER_SNAPSHOT_MS = 4_000;
 const ALERT = "#d9822b";
 const ACTION_ACCENTS: Record<string, string> = {
   leaving: roomColorFor(4).accent,
@@ -369,6 +377,57 @@ function WallRoom({ room, index }: { room: CuratedRoom; index: number }) {
   );
 }
 
+/** Goes idle once nobody has touched the screen for `ms`. Only `wake` ends
+ * it, so the waking tap can't also land on whatever is under the saver. */
+function useIdle(ms: number) {
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    if (idle) return;
+    let timer = setTimeout(() => setIdle(true), ms);
+    function onActivity() {
+      clearTimeout(timer);
+      timer = setTimeout(() => setIdle(true), ms);
+    }
+    window.addEventListener("pointerdown", onActivity, true);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", onActivity, true);
+    };
+  }, [ms, idle]);
+  return [idle, () => setIdle(false)] as const;
+}
+
+/** Every camera, a small clock and the temperature. A tap anywhere only wakes
+ * the panel; it never reaches a camera or a switch underneath. */
+function CameraSaver({ onWake }: { onWake: () => void }) {
+  const { entities, entitiesWithArea } = useHa();
+  const now = useNow(10_000);
+  const temp = entities[CURATED_WEATHER_ENTITY]?.attributes.temperature as number | undefined;
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black">
+      <div className="grid h-full grid-cols-3 grid-rows-2 gap-1 p-1">
+        {CURATED_CAMERAS.map((cam) => (
+          <CameraCard
+            key={cam.entityId}
+            ent={resolveCuratedCamera(entitiesWithArea, cam)}
+            bare
+            fill
+            snapshotEveryMs={SAVER_SNAPSHOT_MS}
+          />
+        ))}
+      </div>
+      <div className="hero-shadow pointer-events-none absolute left-3 top-2.5 text-white">
+        <span className="text-[30px] font-light tabular-nums tracking-[-1px]">
+          {((now.getHours() + 11) % 12) + 1}:{String(now.getMinutes()).padStart(2, "0")}
+        </span>
+        {temp !== undefined && <span className="ml-2 text-[17px] opacity-90">{Math.round(temp)}°</span>}
+      </div>
+      <button aria-label="Show controls" onClick={onWake} className="absolute inset-0 cursor-none" />
+    </div>
+  );
+}
+
 /**
  * The 7" Raspberry Pi touchscreen on the wall (800×480, testpi). Everything
  * on one screen with no scrolling: clock, weather, people, status and quick
@@ -381,6 +440,7 @@ export function WallScreen() {
   const weather = entities[CURATED_WEATHER_ENTITY];
   const isNight = isNightFor(entities["sun.sun"]?.state);
   const rows = Math.ceil(CURATED_ROOMS.length / 2);
+  const [idle, wake] = useIdle(IDLE_MS);
 
   return (
     // cursor-none: labwc keeps drawing the pointer wherever the last touch was.
@@ -413,6 +473,8 @@ export function WallScreen() {
           ))}
         </section>
       </div>
+
+      {idle && <CameraSaver onWake={wake} />}
     </div>
   );
 }
