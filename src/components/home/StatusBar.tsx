@@ -1,14 +1,11 @@
 import {
   DoorClosed,
   DoorOpen,
-  Flame,
   Music,
   Power,
-  Snowflake,
   Sparkles,
   Sun,
   Thermometer,
-  Wind,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -33,6 +30,7 @@ import { AnimatedNumber } from "./AnimatedNumber";
 import { QuickActionToast } from "./QuickActionToast";
 import { Sparkline } from "./Sparkline";
 import { SpotifySearchModal } from "./SpotifySearchModal";
+import { HVAC_STYLES, powerParts } from "./statusIcons";
 import { useEntityHistory } from "./useEntityHistory";
 import { useSpotifyNowPlaying } from "./useSpotifyNowPlaying";
 
@@ -79,14 +77,6 @@ function BigValue({ children, unit }: { children: React.ReactNode; unit?: string
   );
 }
 
-/** W readings of 1000+ read better as kW on a glance-at display. */
-function powerParts(state: string, unit: string | undefined) {
-  const n = parseFloat(state);
-  if (!Number.isFinite(n)) return null;
-  if (unit === "W" && Math.abs(n) >= 1000) return { value: n / 1000, decimals: 2, unit: "kW" };
-  return { value: n, decimals: unit === "W" ? 0 : 2, unit: unit ?? "" };
-}
-
 function PowerTile({ className, onOpen }: { className?: string; onOpen: () => void }) {
   const { entities } = useHa();
   const consumption = entities[CURATED_ENERGY.consumption];
@@ -125,15 +115,6 @@ function PowerTile({ className, onOpen }: { className?: string; onOpen: () => vo
     </button>
   );
 }
-
-const HVAC_STYLES: Record<string, { icon: LucideIcon; bg: string; fg: string }> = {
-  cool: { icon: Snowflake, bg: "#dceafe", fg: "#2f5fae" },
-  heat: { icon: Flame, bg: "#ffe6d2", fg: "#b9621d" },
-  heat_cool: { icon: Thermometer, bg: "#e9e2fb", fg: "#6a4fc0" },
-  auto: { icon: Thermometer, bg: "#e9e2fb", fg: "#6a4fc0" },
-  fan_only: { icon: Wind, bg: "#dcf5e8", fg: "#2b7f5a" },
-  dry: { icon: Wind, bg: "#fff1d6", fg: "#9a6a12" },
-};
 
 function ClimateTile({ onOpen, className }: { onOpen: () => void; className?: string }) {
   const { entities } = useHa();

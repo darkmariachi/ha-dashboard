@@ -7,6 +7,7 @@ export function IconToggleButton({
   on,
   accent,
   spinWhenOn,
+  compact,
   onClick,
 }: {
   icon: LucideIcon;
@@ -15,6 +16,9 @@ export function IconToggleButton({
   accent: string;
   /** Spin the icon while on — for fans. */
   spinWhenOn?: boolean;
+  /** Smaller button that fills its share of the row — the 800×480 wall
+   * screen fits four per room tile. */
+  compact?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -27,7 +31,10 @@ export function IconToggleButton({
       }}
       aria-pressed={on}
       title={label}
-      className="flex h-[76px] w-[88px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[18px] px-1 transition-[background-color,color,box-shadow,transform] duration-300 active:scale-95"
+      className={clsx(
+        "flex shrink-0 flex-col items-center justify-center px-1 transition-[background-color,color,box-shadow,transform] duration-300 active:scale-95",
+        compact ? "h-full min-w-0 max-w-[76px] flex-1 gap-1 rounded-[14px]" : "h-[76px] w-[88px] gap-1.5 rounded-[18px]",
+      )}
       style={
         on
           ? {
@@ -40,7 +47,7 @@ export function IconToggleButton({
       }
     >
       <Icon
-        size={28}
+        size={compact ? 22 : 28}
         strokeWidth={2}
         className={clsx(
           "transition-transform duration-300",
@@ -48,7 +55,12 @@ export function IconToggleButton({
           on && spinWhenOn && "spin-slow",
         )}
       />
-      <span className="w-full truncate text-center text-xs font-semibold leading-tight">
+      <span
+        className={clsx(
+          "w-full truncate text-center font-semibold leading-tight",
+          compact ? "text-[10.5px]" : "text-xs",
+        )}
+      >
         {label}
       </span>
     </button>
