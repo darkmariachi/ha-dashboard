@@ -142,6 +142,7 @@ function Stat({
   icon: Icon,
   label,
   value,
+  detail,
   color,
   alert,
   onOpen,
@@ -149,6 +150,7 @@ function Stat({
   icon: LucideIcon;
   label: string;
   value: React.ReactNode;
+  detail?: React.ReactNode;
   color: string;
   alert?: boolean;
   onOpen?: () => void;
@@ -156,15 +158,18 @@ function Stat({
   return (
     <button
       onClick={onOpen}
-      className="glass flex min-w-0 items-center gap-2 rounded-[16px] px-2.5 py-2 text-left transition-transform active:scale-[0.97]"
+      className="glass flex min-h-0 min-w-0 flex-col justify-between rounded-[16px] px-2.5 py-2 text-left transition-transform active:scale-[0.97]"
       style={alert ? { borderColor: `${ALERT}8c`, boxShadow: `var(--glass-shadow), 0 0 18px -4px ${ALERT}` } : undefined}
     >
-      <Icon size={18} className="shrink-0" style={{ color: alert ? ALERT : color }} />
-      <div className="min-w-0 leading-tight">
-        <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">{label}</div>
-        <div className="truncate text-[15px] font-medium text-text" style={alert ? { color: ALERT } : undefined}>
+      <div className="flex items-center gap-1.5">
+        <Icon size={15} className="shrink-0" style={{ color: alert ? ALERT : color }} />
+        <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">{label}</span>
+      </div>
+      <div className="w-full min-w-0 leading-tight">
+        <div className="truncate text-[17px] font-medium text-text" style={alert ? { color: ALERT } : undefined}>
           {value}
         </div>
+        {detail && <div className="truncate text-[10.5px] text-text-dim">{detail}</div>}
       </div>
     </button>
   );
@@ -179,30 +184,42 @@ function Stats() {
   const power = consumption
     ? powerParts(consumption.state, consumption.attributes.unit_of_measurement as string | undefined)
     : null;
+  const production = entities[CURATED_ENERGY.production];
+  const solar = production
+    ? powerParts(production.state, production.attributes.unit_of_measurement as string | undefined)
+    : null;
   const climate = entities[CURATED_CLIMATE_ENTITY];
   const current = climate?.attributes.current_temperature as number | undefined;
+  const target = climate?.attributes.temperature as number | undefined;
   const mode = climate?.state;
   const ModeIcon = (mode && HVAC_STYLES[mode]?.icon) || Thermometer;
   const openDoors = CURATED_DOOR_SENSORS.filter((d) => entities[d.entityId]?.state === "on");
   const leftOn = away && indoor.length > 0;
+  const byRoom = new Map<string, number>();
+  for (const item of items) byRoom.set(item.room, (byRoom.get(item.room) ?? 0) + 1);
 
   return (
-    <div className="grid grid-cols-2 gap-1.5">
+    <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5">
       <Stat
         icon={Zap}
         label="Power"
         color={roomColorFor(4).accent}
         value={power ? `${power.value.toFixed(power.decimals)} ${power.unit}` : "—"}
+        detail={solar ? `Solar ${solar.value.toFixed(solar.decimals)} ${solar.unit}` : "Using now"}
         onOpen={() => setOpen("power")}
       />
       <Stat
         icon={ModeIcon}
         label="Climate"
         color={roomColorFor(5).accent}
-        value={
-          <>
-            {current ?? "—"}°{mode && mode !== "off" && <span className="text-[11px] capitalize text-text-dim"> {mode.replace(/_/g, " ")}</span>}
-          </>
+        value={`${current ?? "—"}°`}
+        detail={
+          mode && (
+            <span className="capitalize">
+              {mode.replace(/_/g, " ")}
+              {mode !== "off" && target !== undefined && ` · ${target}°`}
+            </span>
+          )
         }
         onOpen={climate ? () => setOpen("climate") : undefined}
       />
@@ -211,7 +228,8 @@ function Stats() {
         label="Doors"
         color={roomColorFor(1).accent}
         alert={openDoors.length > 0}
-        value={openDoors.length ? `${openDoors.length} open` : "All closed"}
+        value={openDoors.length ? `${openDoors.length} open` : "Closed"}
+        detail={openDoors.length ? openDoors.map((d) => d.label).join(", ") : `All ${CURATED_DOOR_SENSORS.length} doors`}
         onOpen={() => setOpen("doors")}
       />
       <Stat
@@ -220,6 +238,11 @@ function Stats() {
         color={roomColorFor(0).accent}
         alert={leftOn}
         value={items.length ? `${items.length} on` : "All off"}
+        detail={
+          leftOn
+            ? "Nobody's home"
+            : [...byRoom].sort((a, b) => b[1] - a[1]).map(([room, n]) => `${room} ${n}`).join(" · ")
+        }
         onOpen={items.length ? () => setOpen("on") : undefined}
       />
 
@@ -360,7 +383,8 @@ export function WallScreen() {
   const rows = Math.ceil(CURATED_ROOMS.length / 2);
 
   return (
-    <div className={clsx("relative h-full overflow-hidden", isNight && "home-night")} data-sheet-root>
+    // cursor-none: labwc keeps drawing the pointer wherever the last touch was.
+    <div className={clsx("relative h-full cursor-none overflow-hidden", isNight && "home-night")} data-sheet-root>
       <WeatherBackground condition={weather?.state} isNight={isNight} />
 
       <div className="relative grid h-full grid-cols-[236px_minmax(0,1fr)] gap-3 p-3">
@@ -377,7 +401,7 @@ export function WallScreen() {
           </div>
           <Weather />
           <People />
-          <div className="mt-auto flex flex-col gap-1.5 [text-shadow:none]">
+          <div className="flex min-h-0 flex-1 flex-col gap-1.5 [text-shadow:none]">
             <Stats />
             <QuickActions />
           </div>

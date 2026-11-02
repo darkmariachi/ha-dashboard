@@ -32,8 +32,8 @@ export function IconToggleButton({
       aria-pressed={on}
       title={label}
       className={clsx(
-        "flex shrink-0 flex-col items-center justify-center px-1 transition-[background-color,color,box-shadow,transform] duration-300 active:scale-95",
-        compact ? "h-full min-w-0 max-w-[76px] flex-1 gap-1 rounded-[14px]" : "h-[76px] w-[88px] gap-1.5 rounded-[18px]",
+        "flex shrink-0 flex-col items-center justify-center transition-[background-color,color,box-shadow,transform] duration-300 active:scale-95",
+        compact ? "h-full min-w-0 max-w-[120px] flex-1 gap-1 rounded-[14px] px-0.5" : "h-[76px] w-[88px] gap-1.5 rounded-[18px] px-1",
       )}
       style={
         on
