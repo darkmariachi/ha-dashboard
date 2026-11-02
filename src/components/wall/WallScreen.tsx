@@ -36,7 +36,7 @@ const HOME_GREEN = "#3ee08f";
 const IDLE_MS = 2 * 60_000;
 /** Stills, not live streams: six MJPEG streams are too much for the Pi on its
  * weak power supply, and a still that fails just tries again next tick. */
-const SAVER_SNAPSHOT_MS = 4_000;
+const SAVER_SNAPSHOT_MS = 8_000;
 const ALERT = "#d9822b";
 const ACTION_ACCENTS: Record<string, string> = {
   leaving: roomColorFor(4).accent,
