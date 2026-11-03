@@ -444,7 +444,8 @@ export function WallScreen() {
 
   return (
     // cursor-none: labwc keeps drawing the pointer wherever the last touch was.
-    <div className={clsx("relative h-full cursor-none overflow-hidden", isNight && "home-night")} data-sheet-root>
+    // select-none: a press-and-drag on the touchscreen otherwise highlights labels.
+    <div className={clsx("relative h-full cursor-none select-none overflow-hidden", isNight && "home-night")} data-sheet-root>
       <WeatherBackground condition={weather?.state} isNight={isNight} />
 
       <div className="relative grid h-full grid-cols-[236px_minmax(0,1fr)] gap-3 p-3">
