@@ -6,6 +6,7 @@ import { roomColorFor } from "../../lib/roomPalette";
 import { useNow } from "../../lib/useNow";
 import { Sheet, SheetSection } from "./Sheet";
 import { useEntityHistory } from "./useEntityHistory";
+import { energyCost, money, useEnergyPrice } from "../../lib/energyCost";
 
 const USAGE = roomColorFor(4).accent;
 const SOLAR = "#2f9e6f";
@@ -121,6 +122,8 @@ export function PowerModal({ onClose }: { onClose: () => void }) {
   const solar = Math.max(0, num(entities, CURATED_ENERGY.production) ?? 0);
   const grid = usage === null ? null : usage - solar;
   const devices = senseDevices(entities);
+  const price = useEnergyPrice();
+  const cost = energyCost(entities, price, now);
   const running = devices.filter((d) => d.power >= 5);
   const co2 = num(entities, "sensor.electricity_maps_co2_intensity");
   const fossil = num(entities, "sensor.electricity_maps_grid_fossil_fuel_percentage");
@@ -181,6 +184,16 @@ export function PowerModal({ onClose }: { onClose: () => void }) {
           <Stat label="To grid" value={kwh(num(entities, `${SENSE}_daily_to_grid`))} />
         </div>
       </SheetSection>
+
+      {price !== null && (
+        <SheetSection title={`Cost · ${"$"}${price.toFixed(2)}/kWh`}>
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Today" value={money(cost.today)} sub="from the grid" />
+            <Stat label="This month" value={money(cost.month)} sub={cost.projected !== null ? `on track for ${money(cost.projected)}` : undefined} />
+            <Stat label="Solar saved" value={money(cost.solarSaved)} sub="this month" />
+          </div>
+        </SheetSection>
+      )}
 
       <SheetSection title="This month">
         <div className="grid grid-cols-2 gap-2">

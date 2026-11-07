@@ -8,7 +8,8 @@
 //   POST /subscribe      { subscription, token, person, label }
 //   POST /unsubscribe    { endpoint, token }
 //   POST /test           { endpoint, token }
-//   POST /send           (x-push-secret) { title, message, url?, tag?, people? }
+//   POST /send           (x-push-secret) { title, message, url?, tag?, people?, image? (JPEG data URL) }
+//   GET  /img/<id>.jpg   a sent notification's picture (unguessable id, kept 48 h)
 //   POST /pair/complete  { id, token, blob }
 //   POST /pair/poll      { id } -> { blob | null }
 //   POST /visitors/list  { token } -> visit log (visits.mjs)
@@ -29,7 +30,8 @@
 
 import { createServer } from "node:http";
 import { readFile, writeFile, rename } from "node:fs/promises";
-import { timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import webpush from "web-push";
 import { parseDoors, startDoorWatcher } from "./doors.mjs";
 import { parseGroups, startReachabilityWatcher } from "./reachability.mjs";
@@ -118,12 +120,12 @@ function secretOk(given) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-async function body(req) {
+async function body(req, limit = 16 * 1024) {
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 16 * 1024) throw new Error("too large");
+    if (size > limit) throw new Error("too large");
     chunks.push(chunk);
   }
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
@@ -168,11 +170,52 @@ function targetsFor(people) {
   return Object.keys(subs).filter((e) => !wanted || wanted.includes((subs[e].person || "").toLowerCase()));
 }
 
+// --- Notification pictures --------------------------------------------------
+// /send can carry an `image` (JPEG data URL, e.g. the doorbell frame from the
+// faces service). It's kept under an unguessable name and served at
+// /api/push/img/<id>.jpg so the phone can fetch it for the notification
+// (a push payload is too small to hold it); deleted after IMG_KEEP_MS.
+const IMG_DIR = "/data/notify-img";
+const IMG_KEEP_MS = 48 * 3600_000;
+
+async function saveImage(dataUrl) {
+  const m = /^data:image\/jpeg;base64,(.+)$/.exec(dataUrl ?? "");
+  if (!m) return undefined;
+  const buf = Buffer.from(m[1], "base64");
+  if (buf.length > 600_000) return undefined;
+  await mkdir(IMG_DIR, { recursive: true });
+  const id = randomBytes(16).toString("hex");
+  await writeFile(`${IMG_DIR}/${id}.jpg`, buf);
+  return `/api/push/img/${id}.jpg`;
+}
+
+async function pruneImages() {
+  try {
+    for (const f of await readdir(IMG_DIR)) {
+      const st = await stat(`${IMG_DIR}/${f}`);
+      if (Date.now() - st.mtimeMs > IMG_KEEP_MS) await unlink(`${IMG_DIR}/${f}`);
+    }
+  } catch {
+    /* no pictures yet */
+  }
+}
+setInterval(pruneImages, 3600_000);
+
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, "http://x").pathname;
   try {
     if (req.method === "GET" && path === "/health") return reply(res, 200, { ok: true, subscriptions: Object.keys(subs).length });
     if (req.method === "GET" && path === "/vapid") return reply(res, 200, { publicKey: VAPID_PUBLIC_KEY });
+    const img = /^\/img\/([0-9a-f]{32})\.jpg$/.exec(path);
+    if (req.method === "GET" && img) {
+      try {
+        const buf = await readFile(`${IMG_DIR}/${img[1]}.jpg`);
+        res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=172800" });
+        return res.end(buf);
+      } catch {
+        return reply(res, 404, { error: "gone" });
+      }
+    }
 
     if (req.method === "POST" && path === "/subscribe") {
       const { subscription, token, person, label } = await body(req);
@@ -238,10 +281,12 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/send") {
       if (!secretOk(req.headers["x-push-secret"])) return reply(res, 401, { error: "bad secret" });
-      const { title, message, url, tag, people } = await body(req);
+      // LAN-only (refused by nginx), so it may carry a picture.
+      const { title, message, url, tag, people, image } = await body(req, 1024 * 1024);
       if (!title && !message) return reply(res, 400, { error: "title or message required" });
       const targets = targetsFor(people);
-      const sent = await deliver(targets, { title: title ?? "", message: message ?? "", url: url || "/phone", tag: tag || undefined });
+      const picture = await saveImage(image).catch(() => undefined);
+      const sent = await deliver(targets, { title: title ?? "", message: message ?? "", url: url || "/phone", tag: tag || undefined, image: picture });
       log("sent", JSON.stringify(title), "to", sent, "of", targets.length);
       return reply(res, 200, { sent, targets: targets.length });
     }

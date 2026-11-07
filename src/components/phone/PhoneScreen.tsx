@@ -21,6 +21,7 @@ import { NotificationsCard } from "../devices/NotificationsCard";
 import { InsightsColumn } from "../insights/InsightsPage";
 import { QuickActionLink } from "./QuickActionLink";
 import { ThermostatAwayLink } from "./ThermostatAwayLink";
+import { AlarmLink } from "./AlarmLink";
 import { YouTubeCard } from "../devices/YouTubeCard";
 import { RoomCard } from "../home/RoomCard";
 import { StatusBar } from "../home/StatusBar";
@@ -272,6 +273,7 @@ export function PhoneScreen() {
       <TabBar />
       <QuickActionLink />
       <ThermostatAwayLink />
+      <AlarmLink />
     </div>
   );
 }

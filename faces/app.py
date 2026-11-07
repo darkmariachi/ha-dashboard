@@ -286,6 +286,183 @@ def fetch_frame(client: httpx.Client, camera: str, t: int) -> np.ndarray:
     return img
 
 
+# ------------------------------------------------------------ announcing
+#
+# For live detections only: tell Home Assistant who was seen (event
+# `faces_seen` + sensor.faces_<camera>, which the TV pop-up automation uses)
+# and push notifications through the push service:
+#   * doorbell ring: always; named when someone was recognised at that
+#     camera in the last 90 s (the person detection usually comes first);
+#   * a visitor with "Notify when they arrive" on: "<name> is at the …";
+#   * NOTIFY_HOUSEHOLD (e.g. the kids): "<name> is home", when they hadn't
+#     been seen for 2 h, 6 am–11 pm;
+#   * an unknown face at night (10 pm–6 am) or while nobody is home.
+
+PUSH_URL = os.environ.get("PUSH_URL", "http://push:8082/send")
+PUSH_SECRET = os.environ.get("PUSH_SECRET", "")
+NOTIFY_HOUSEHOLD = [n.strip() for n in os.environ.get("NOTIFY_HOUSEHOLD", "Andres,Daniel").split(",") if n.strip()]
+HOME_PEOPLE = [p.strip() for p in os.environ.get("HOME_PEOPLE", "person.rodolfo,person.priscilla").split(",") if p.strip()]
+CAMERA_NAMES = {"camera.g4_doorbell_pro_medium": "front door", "camera.driveway_medium": "driveway"}
+VISITOR_GAP_MS = 30 * 60_000
+HOUSEHOLD_GAP_MS = 2 * 3600_000
+UNKNOWN_GAP_MS = 10 * 60_000
+
+_sent: dict[str, int] = {}  # dedupe key -> last sent (ms)
+_rings: dict[str, tuple[int, set]] = {}  # camera -> (first frame t, names sent; "" = generic)
+_recent: list[tuple[str, int, str]] = []  # (camera, t, name) for naming rings
+_cache: dict[str, tuple[float, object]] = {}
+
+
+def _cached(key: str, ttl: float, fetch):
+    hit = _cache.get(key)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    val = fetch()
+    _cache[key] = (time.time(), val)
+    return val
+
+
+def _ha(method: str, path: str, **kw):
+    return httpx.request(method, f"{HA_URL}{path}", headers={"Authorization": f"Bearer {HA_TOKEN}"}, timeout=10, **kw)
+
+
+def _visitors() -> dict:
+    """Visitor id -> {name, notify}, from the push service's visit log."""
+    def fetch():
+        base = PUSH_URL.rsplit("/", 1)[0]
+        r = httpx.post(f"{base}/visitors/list", json={"token": HA_TOKEN}, timeout=10)
+        r.raise_for_status()
+        return {p["id"]: p for p in r.json().get("people", [])}
+    try:
+        return _cached("visitors", 300, fetch)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _local_hour(t_ms: int) -> int:
+    from zoneinfo import ZoneInfo
+
+    tz = _cached("tz", 3600, lambda: _ha("GET", "/api/config").json().get("time_zone", "UTC"))
+    return datetime.fromtimestamp(t_ms / 1000, ZoneInfo(tz)).hour
+
+
+def _nobody_home() -> bool:
+    try:
+        return all(_ha("GET", f"/api/states/{p}").json().get("state") != "home" for p in HOME_PEOPLE)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _name(subject: str, visitors: dict) -> str | None:
+    if subject == "ignore":
+        return None
+    if subject.startswith("household:"):
+        return subject.split(":", 1)[1]
+    return (visitors.get(subject) or {}).get("name", subject)
+
+
+def _push(title: str, message: str, tag: str, img: np.ndarray | None, url: str = "/phone/cameras"):
+    if not PUSH_SECRET:
+        return
+    image = None
+    if img is not None:
+        h, w = img.shape[:2]
+        small = cv2.resize(img, (960, int(h * 960 / w))) if w > 960 else img
+        ok, jpg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        if ok:
+            image = "data:image/jpeg;base64," + base64.b64encode(jpg.tobytes()).decode()
+    r = httpx.post(
+        PUSH_URL,
+        headers={"x-push-secret": PUSH_SECRET},
+        json={"title": title, "message": message, "url": url, "tag": tag, "image": image},
+        timeout=15,
+    )
+    log.info("push %r -> %s", title, r.status_code)
+
+
+def _once(key: str, gap_ms: int, now: int) -> bool:
+    """True the first time `key` comes up within gap_ms (and records it)."""
+    if now - _sent.get(key, 0) < gap_ms:
+        return False
+    _sent[key] = now
+    return True
+
+
+def _join(names: list[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def announce(item, subjects: list[str | None], img: np.ndarray):
+    camera, t, kind = item["camera"], item["t"], item["kind"]
+    where = CAMERA_NAMES.get(camera, camera.split(".")[-1].replace("_", " "))
+    visitors = _visitors()
+    named = [(s, _name(s, visitors)) for s in subjects if s]
+    names = sorted({n for _, n in named if n})
+    unknown = sum(1 for s in subjects if s is None)
+    now = now_ms()
+    global _recent
+    _recent = [r for r in _recent if now - r[1] < 120_000] + [(camera, t, n) for n in names]
+
+    tv_title = None
+    if kind == "ring":
+        ring_names = sorted({n for c, rt, n in _recent if c == camera and abs(rt - t) < 90_000})
+        # Each ring is looked at in two frames (a few s apart): one ring =
+        # frames within 15 s. Send on the first frame, and again only if
+        # the next one adds a name (same tag, so it replaces the first).
+        ring = _rings.get(camera)
+        if ring is None or t - ring[0] > 15_000:
+            ring = _rings[camera] = (t, set())
+        sent = ring[1]
+        if not sent or not set(ring_names) <= sent - {""}:
+            sent.update(ring_names or [""])
+            title = f"{_join(ring_names)} rang the doorbell" if ring_names else "Someone rang the doorbell"
+            _push(title, f"At the {where}", "doorbell", img)
+    else:
+        for subj, name in named:
+            if not name:
+                continue
+            v = visitors.get(subj)
+            if v and v.get("notify") and _once(f"visitor|{subj}", VISITOR_GAP_MS, now):
+                tv_title = f"{name} is at the {where}"
+                _push(tv_title, "Recognised by the camera", f"face-{subj}", img, "/phone/visitors")
+            if subj.startswith("household:") and name in NOTIFY_HOUSEHOLD and 6 <= _local_hour(t) < 23:
+                with db_lock:
+                    prev = db.execute(
+                        "select max(t) from faces where subject = ? and t < ?", (subj, t - 60_000)
+                    ).fetchone()[0]
+                if (prev is None or t - prev > HOUSEHOLD_GAP_MS) and _once(f"home|{subj}", HOUSEHOLD_GAP_MS, now):
+                    tv_title = f"{name} is home"
+                    _push(tv_title, f"Seen at the {where}", f"home-{name}", img, "/phone/visitors")
+        if unknown and not names:
+            hour = _local_hour(t)
+            if (hour >= 22 or hour < 6 or _nobody_home()) and _once(f"unknown|{camera}", UNKNOWN_GAP_MS, now):
+                tv_title = f"Unknown person at the {where}"
+                _push(tv_title, "Not recognised by the camera", f"unknown-{camera}", img)
+
+    # Tell HA (the TV pop-up automation listens for this).
+    data = {
+        "camera": camera,
+        "where": where,
+        "kind": kind,
+        "t": t,
+        "names": names,
+        "subjects": [s for s, _ in named],
+        "unknown": unknown,
+        "tv_title": tv_title,
+    }
+    _ha("POST", "/api/events/faces_seen", json=data)
+    if names or unknown:
+        slug = where.replace(" ", "_")
+        _ha(
+            "POST",
+            f"/api/states/sensor.faces_{slug}",
+            json={
+                "state": ", ".join(names) if names else "unknown",
+                "attributes": {**data, "friendly_name": f"Faces at the {where}", "icon": "mdi:face-recognition"},
+            },
+        )
+
+
 def worker():
     load_model()
     rematch_all()  # apply the current matching rule to everything stored
@@ -319,6 +496,11 @@ def worker():
                 )
                 db.commit()
             worker_state["done"] += 1
+            if item["prio"] > 0:  # live detections only, never the backfill
+                try:
+                    announce(item, [m[0] for m in matches], img)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("announce failed: %s", e)
         except Exception as e:  # noqa: BLE001
             with db_lock:
                 tries = item["tries"] + 1

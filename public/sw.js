@@ -20,7 +20,7 @@ self.addEventListener("activate", (event) => {
 });
 
 // --- Web push (push/server.mjs) --------------------------------------------
-// Payload: { title, message, url, tag }. Same tag replaces the previous
+// Payload: { title, message, url, tag, image? }. Same tag replaces the previous
 // notification instead of stacking (e.g. repeated "left on" reminders).
 self.addEventListener("push", (event) => {
   let data = {};
@@ -35,6 +35,8 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       // Status-bar icon on Android: white on transparent, or the browser's shows.
       badge: "/badge-96.png",
+      // A picture (doorbell frame) where the platform shows one (Android).
+      image: data.image || undefined,
       tag: data.tag || undefined,
       renotify: Boolean(data.tag),
       data: { url: data.url || "/phone" },

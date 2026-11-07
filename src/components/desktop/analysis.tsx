@@ -9,6 +9,7 @@ import { useNow } from "../../lib/useNow";
 import { DAYS, dayStarts, hm } from "../devices/screenTime";
 import { SignedImg, snapshotPath, typeInfo, useCameraEvents, type CameraEvent } from "../home/ActivityFeed";
 import { useEntityHistory } from "../home/useEntityHistory";
+import { energyCost, money, useEnergyPrice } from "../../lib/energyCost";
 import { useStateHistory } from "../home/useStateHistory";
 import { addSpan } from "../devices/screenTime";
 import { BarChart, LineChart, Timeline } from "./charts";
@@ -34,6 +35,8 @@ export function EnergyBreakdown({ delay = 0 }: { delay?: number }) {
   const used = dailyMax(hist?.[`${SENSE}_daily_energy`], starts);
   const made = dailyMax(hist?.[`${SENSE}_daily_production`], starts);
   const devices = senseDevices(entities);
+  const price = useEnergyPrice();
+  const cost = energyCost(entities, price, now);
   const total = num(entities[`${SENSE}_energy`]) ?? 0;
   const v = (k: string) => num(entities[`${SENSE}_${k}`]);
   const k = (x: number | null) => (x === null ? "—" : `${x.toFixed(1)} kWh`);
@@ -68,6 +71,29 @@ export function EnergyBreakdown({ delay = 0 }: { delay?: number }) {
             <KV k="To grid" v={k(v("monthly_to_grid"))} color={C.green} />
           </div>
         </div>
+        {price !== null && (
+          <div className="mt-4 grid grid-cols-4 gap-3 border-t border-dx-line pt-3">
+            <div>
+              <Label>Today</Label>
+              <Big value={money(cost.today)} size={20} color={C.pink} />
+            </div>
+            <div>
+              <Label>Month</Label>
+              <Big value={money(cost.month)} size={20} />
+            </div>
+            <div>
+              <Label>Projected</Label>
+              <Big value={money(cost.projected)} size={20} />
+            </div>
+            <div>
+              <Label>Solar saved</Label>
+              <Big value={money(cost.solarSaved)} size={20} color={C.green} />
+            </div>
+            <div className="dx-num col-span-4 -mt-1 text-[10px] text-dx-faint">
+              grid cost at {"$"}{price.toFixed(2)}/kWh, from Home Assistant's energy settings
+            </div>
+          </div>
+        )}
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div>
             <Label>Grid CO₂</Label>

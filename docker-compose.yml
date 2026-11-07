@@ -59,6 +59,11 @@ services:
     environment:
       HA_URL: ${PUSH_HA_URL:-http://192.168.1.54:8123}
       HA_TOKEN: ${PUSH_HA_TOKEN:-}
+      # Doorbell / arrival / unknown-face alerts go through the push service.
+      PUSH_URL: http://push:8082/send
+      PUSH_SECRET: ${PUSH_SECRET:-}
+      # Household members who get an "is home" alert (2 h apart, 6 am-11 pm).
+      NOTIFY_HOUSEHOLD: ${FACES_NOTIFY_HOUSEHOLD:-Andres,Daniel}
     volumes:
       - ./faces-data:/data
     restart: unless-stopped
