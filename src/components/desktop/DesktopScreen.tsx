@@ -22,6 +22,10 @@ import "@fontsource-variable/nunito";
 import "@fontsource-variable/josefin-sans";
 import "./themes.css";
 import "./themes-fantasy.css";
+import "./themes-claude.css";
+import "@fontsource-variable/source-serif-4";
+import "@fontsource-variable/dm-sans";
+import "@fontsource/caveat/600.css";
 import {
   Cctv,
   ChartColumn,
@@ -299,7 +303,7 @@ function TopBar({
   return (
     <header className="dx-topbar relative z-10 flex h-[60px] shrink-0 items-center gap-5 border-b border-dx-line px-6 backdrop-blur-md">
       <div className="min-w-0">
-        <Label className="text-dx-faint">Home / Ops</Label>
+        <Label className="dx-kicker text-dx-faint">Home / Ops</Label>
         <h1 className="dx-h1 truncate text-[19px] font-semibold uppercase tracking-[0.06em] text-dx-text">{title}</h1>
       </div>
 

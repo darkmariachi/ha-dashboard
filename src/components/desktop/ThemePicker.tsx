@@ -1,6 +1,7 @@
 import { Check, X } from "lucide-react";
 import { useEffect } from "react";
 import { DESKTOP_THEMES, type DesktopTheme } from "./themes";
+import doodles from "./doodles.svg";
 
 /** Fonts per theme, for the preview cards (the real ones live in themes.css). */
 const PREVIEW_FONT: Record<string, { title: string; body: string; num: string; upper: boolean }> = {
@@ -10,6 +11,7 @@ const PREVIEW_FONT: Record<string, { title: string; body: string; num: string; u
   tactical: { title: "Bebas Neue", body: "Barlow", num: "Barlow Condensed", upper: true },
   hextech: { title: "Cinzel Variable", body: "Barlow", num: "Barlow", upper: true },
   ocarina: { title: "Uncial Antiqua", body: "Nunito Variable", num: "Nunito Variable", upper: false },
+  claude: { title: "Source Serif 4 Variable", body: "DM Sans Variable", num: "DM Sans Variable", upper: false },
   frost: { title: "Josefin Sans Variable", body: "Josefin Sans Variable", num: "Josefin Sans Variable", upper: true },
 };
 
@@ -26,13 +28,16 @@ function Preview({ t }: { t: DesktopTheme }) {
     hextech: { radius: 0, clip: undefined },
     ocarina: { radius: 12, clip: undefined },
     frost: { radius: 0, clip: undefined },
+    claude: { radius: 14, clip: undefined },
   }[t.id] ?? { radius: 8, clip: undefined };
   const bg =
     t.id === "vice"
       ? "linear-gradient(180deg, #0d0620, #2a0b45 45%, #6a1257 75%, #f7854a)"
       : t.id === "hextech"
         ? `radial-gradient(260px 120px at 50% -20%, rgba(3,151,171,.35), transparent), ${p.bg}`
-        : t.id === "ocarina"
+        : t.id === "claude"
+          ? `url(${doodles}) center / 300% no-repeat, ${p.bg}`
+          : t.id === "ocarina"
           ? `radial-gradient(200px 120px at 30% 20%, rgba(111,211,255,.18), transparent), radial-gradient(260px 160px at 50% 110%, rgba(92,207,110,.2), transparent), ${p.bg}`
           : t.id === "frost"
             ? `linear-gradient(180deg, #16181c, ${p.bg} 60%, #23262b)`
@@ -66,7 +71,7 @@ function Preview({ t }: { t: DesktopTheme }) {
               background: primary,
               transform: t.id === "hextech" ? "rotate(45deg)" : t.id === "tactical" ? "skewX(-18deg)" : undefined,
               borderRadius: t.id === "vice" ? 99 : 0,
-              boxShadow: `0 0 8px ${primary}`,
+              boxShadow: t.id === "claude" ? undefined : `0 0 8px ${primary}`,
             }}
           />
           <span
@@ -92,7 +97,13 @@ function Preview({ t }: { t: DesktopTheme }) {
           {bars.map((c, i) => (
             <span
               key={c + i}
-              style={{ width: 14, height: [18, 28, 12, 34, 22, 16][i], background: c, boxShadow: `0 0 6px ${c}88`, borderRadius: t.id === "vice" ? 3 : 0 }}
+              style={{
+                width: 14,
+                height: [18, 28, 12, 34, 22, 16][i],
+                background: c,
+                boxShadow: t.id === "claude" ? undefined : `0 0 6px ${c}88`,
+                borderRadius: t.id === "vice" || t.id === "claude" ? 4 : 0,
+              }}
             />
           ))}
         </div>

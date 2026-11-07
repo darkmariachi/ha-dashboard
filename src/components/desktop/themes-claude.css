@@ -1,0 +1,101 @@
+/*
+ * Claude: the one light theme. Cream paper, warm ink, clay accents, serif
+ * headings and hand-drawn doodles in the background.
+ *
+ * Light-theme plumbing: --dx-ink flips the components' translucent-white
+ * details (tracks, grid lines) to ink, and --color-white does the same for
+ * Tailwind's bg-white/… and border-white/… washes. text-white is only used
+ * on dark overlays (camera labels, badges), so it's pinned back to white.
+ */
+
+.dx[data-dx-theme="claude"] {
+  --dx-ink: 31 30 29;
+  --color-white: #1f1e1d;
+  --font-dx: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Source Serif 4 Variable", Georgia, serif;
+  --font-mono: "DM Sans Variable", ui-sans-serif, sans-serif;
+  --dx-title-size: 14.5px;
+  --dx-title-track: 0;
+  color-scheme: light;
+  background: var(--color-dx-bg);
+}
+.dx[data-dx-theme="claude"] [class*="text-white"] { color: #fff; }
+.dx[data-dx-theme="claude"] .dx-num { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* The doodles, faint, behind everything. */
+.dx[data-dx-theme="claude"] .dx-fx::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("./doodles.svg") center / cover no-repeat;
+  opacity: 0.5;
+}
+
+/* No neon: glows and drop shadows off (the theme picker keeps its ring). */
+.dx[data-dx-theme="claude"] svg * { filter: none !important; }
+.dx[data-dx-theme="claude"] [style*="box-shadow"]:not(.dx-theme-card) { box-shadow: none !important; }
+.dx[data-dx-theme="claude"] [style*="drop-shadow"] { filter: none !important; }
+
+.dx[data-dx-theme="claude"] .dx-panel {
+  border-radius: 16px;
+  background: var(--color-dx-panel);
+  border: 1px solid rgba(31, 30, 29, 0.1);
+  box-shadow: 0 1px 2px rgba(60, 40, 20, 0.05), 0 8px 24px -14px rgba(60, 40, 20, 0.25);
+}
+.dx[data-dx-theme="claude"] .dx-panel-head { border-bottom-color: rgba(31, 30, 29, 0.07); }
+.dx[data-dx-theme="claude"] .dx-title {
+  text-transform: none;
+  color: var(--color-dx-text);
+  font-weight: 600;
+}
+/* A little clay asterisk instead of the tick. */
+.dx[data-dx-theme="claude"] .dx-tick {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 0 !important;
+  background: var(--color-dx-pink) !important;
+  clip-path: polygon(
+    50% 0, 58% 36%, 93% 18%, 66% 46%, 100% 60%, 62% 60%, 75% 96%, 50% 68%, 25% 96%, 38% 60%, 0 60%, 34% 46%, 7% 18%, 42% 36%
+  );
+}
+/* Labels lose the shouty caps. */
+.dx[data-dx-theme="claude"] .dx-panel :is(.uppercase) { text-transform: none; letter-spacing: 0.01em; }
+
+.dx[data-dx-theme="claude"] .dx-rail { background: #efe9dd; border-right-color: rgba(31, 30, 29, 0.08); }
+.dx[data-dx-theme="claude"] .dx-topbar { background: rgba(245, 240, 232, 0.85); border-bottom-color: rgba(31, 30, 29, 0.08); }
+.dx[data-dx-theme="claude"] .dx-nav { border-radius: 12px; }
+.dx[data-dx-theme="claude"] .dx-nav.active { background: rgba(217, 119, 87, 0.14); color: #b4532f; }
+.dx[data-dx-theme="claude"] .dx-logo {
+  border-radius: 12px;
+  background: var(--color-dx-pink);
+  box-shadow: none;
+  color: #fff;
+  font-size: 22px;
+}
+.dx[data-dx-theme="claude"] .dx-kicker {
+  font-family: "Caveat", cursive;
+  font-size: 17px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-dx-pink);
+  line-height: 1;
+  transform: rotate(-2deg);
+  transform-origin: left;
+}
+.dx[data-dx-theme="claude"] .dx-h1 {
+  text-transform: none;
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.dx[data-dx-theme="claude"] .dx-btn {
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  padding: 4px 12px;
+}
+.dx[data-dx-theme="claude"] .dx-seg { border-radius: 999px; }
+.dx[data-dx-theme="claude"] .dx-seg > button { border-radius: 999px; text-transform: none; letter-spacing: 0; }
+.dx[data-dx-theme="claude"] .dx-scroll::-webkit-scrollbar-thumb { background: rgba(31, 30, 29, 0.15); }

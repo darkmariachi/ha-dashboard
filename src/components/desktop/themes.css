@@ -12,6 +12,8 @@
   --font-dx-title: var(--font-dx);
   --dx-title-size: 10.5px;
   --dx-title-track: 0.16em;
+  /* RGB of the translucent details (tracks, grid lines); ink on light themes. */
+  --dx-ink: 255 255 255;
 }
 .dx .dx-num { font-family: var(--font-mono); }
 .dx .dx-title { font-family: var(--font-dx-title); font-size: var(--dx-title-size); letter-spacing: var(--dx-title-track); }

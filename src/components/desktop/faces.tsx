@@ -438,7 +438,7 @@ function VisitSuggestions({ subject, name, visits, onChanged }: { subject: strin
               }
               title={`${camLabel(f.camera)} · ${when(f.t)}${f.sim !== null ? ` · ${Math.round(f.sim * 100)}% like ${first}` : ""}`}
               className="relative aspect-square overflow-hidden rounded-[4px] border bg-black"
-              style={{ borderColor: on ? C.green : "rgba(255,255,255,0.08)", boxShadow: on ? `0 0 8px ${C.green}` : undefined }}
+              style={{ borderColor: on ? C.green : "rgb(var(--dx-ink) / 0.08)", boxShadow: on ? `0 0 8px ${C.green}` : undefined }}
             >
               <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", !on && picked.size > 0 && "opacity-60")} />
               {f.sim !== null && (

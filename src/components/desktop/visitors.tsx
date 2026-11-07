@@ -188,7 +188,7 @@ function PresenceHeatmap({ visits, now, color }: { visits: Session[]; now: numbe
                 title={`${day(starts[d])} ${String(h).padStart(2, "0")}:00 · ${Math.round(m)} min`}
                 className="h-[7px] rounded-[1px]"
                 style={{
-                  background: m > 0 ? color : "rgba(255,255,255,0.035)",
+                  background: m > 0 ? color : "rgb(var(--dx-ink) / 0.035)",
                   opacity: m > 0 ? 0.25 + 0.75 * Math.min(1, m / 60) : 1,
                   boxShadow: m >= 45 ? `0 0 6px ${color}` : undefined,
                 }}

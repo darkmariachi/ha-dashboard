@@ -103,8 +103,8 @@ export function Switch({
       onClick={onChange}
       className="relative h-[18px] w-[32px] shrink-0 cursor-pointer rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-35"
       style={{
-        background: on ? `${color}33` : "rgba(255,255,255,0.05)",
-        borderColor: on ? color : "rgba(255,255,255,0.12)",
+        background: on ? `${color}33` : "rgb(var(--dx-ink) / 0.05)",
+        borderColor: on ? color : "rgb(var(--dx-ink) / 0.12)",
         boxShadow: on ? `0 0 10px -2px ${color}` : undefined,
       }}
     >
@@ -206,7 +206,7 @@ export function Ring({
     <div className="flex flex-col items-center gap-1">
       <div className="relative" style={{ width: size, height: size }}>
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-          <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={7} />
+          <circle cx={50} cy={50} r={r} fill="none" stroke="rgb(var(--dx-ink) / 0.06)" strokeWidth={7} />
           {[...Array(24)].map((_, i) => (
             <line
               key={i}
@@ -214,7 +214,7 @@ export function Ring({
               y1={3}
               x2={50}
               y2={6}
-              stroke="rgba(255,255,255,0.12)"
+              stroke="rgb(var(--dx-ink) / 0.12)"
               strokeWidth={1}
               transform={`rotate(${i * 15} 50 50)`}
             />

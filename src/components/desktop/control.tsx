@@ -389,7 +389,7 @@ export function SprinklerPanel({ delay = 0 }: { delay?: number }) {
           .map((s) => {
             const on = entities[s.entityId]?.state === "on";
             return (
-              <span key={s.entityId} className="rounded-sm border px-1.5 py-0.5 text-[10.5px]" style={on ? { color: C.green, borderColor: `${C.green}66` } : { color: C.faint, borderColor: "rgba(255,255,255,0.07)" }}>
+              <span key={s.entityId} className="rounded-sm border px-1.5 py-0.5 text-[10.5px]" style={on ? { color: C.green, borderColor: `${C.green}66` } : { color: C.faint, borderColor: "rgb(var(--dx-ink) / 0.07)" }}>
                 {s.name}
               </span>
             );

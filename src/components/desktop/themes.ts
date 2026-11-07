@@ -200,6 +200,29 @@ export const DESKTOP_THEMES: DesktopTheme[] = [
       red: "#c94a3f",
     },
   },
+  {
+    id: "claude",
+    name: "Claude",
+    inspiredBy: "Claude",
+    tagline: "Cream paper, clay accents, serif type and hand-drawn doodles",
+    primary: "pink",
+    mark: "✻",
+    palette: {
+      bg: "#f5f0e8",
+      panel: "#fbf9f4",
+      raise: "#efe9de",
+      line: "rgba(31, 30, 29, 0.1)",
+      text: "#1f1e1d",
+      dim: "#6b6862",
+      faint: "#a6a197",
+      cyan: "#2f7f8a",
+      pink: "#d97757",
+      violet: "#7a68c2",
+      amber: "#c08a1e",
+      green: "#5b8f4e",
+      red: "#c2412d",
+    },
+  },
 ];
 
 const KEY = "ha-dashboard:desktop-theme";

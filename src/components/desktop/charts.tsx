@@ -88,10 +88,10 @@ export function LineChart({
             ))}
           </defs>
           {[0.25, 0.5, 0.75].map((f) => (
-            <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} stroke="white" strokeOpacity={0.05} strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />
+            <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} style={{ stroke: "rgb(var(--dx-ink))" }} strokeOpacity={0.05} strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />
           ))}
           {ticks.map((t) => (
-            <line key={t.pos} x1={t.pos * W} x2={t.pos * W} y1={0} y2={H} stroke="white" strokeOpacity={0.035} vectorEffect="non-scaling-stroke" />
+            <line key={t.pos} x1={t.pos * W} x2={t.pos * W} y1={0} y2={H} style={{ stroke: "rgb(var(--dx-ink))" }} strokeOpacity={0.035} vectorEffect="non-scaling-stroke" />
           ))}
           {usable.map((s, i) => {
             const pts = s.values.map((v, j) => `${x(j, s.values.length).toFixed(1)} ${y(v).toFixed(1)}`).join(" L");
@@ -111,7 +111,7 @@ export function LineChart({
             );
           })}
           {hover !== null && (
-            <line x1={x(hover, n)} x2={x(hover, n)} y1={0} y2={H} stroke="white" strokeOpacity={0.4} strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+            <line x1={x(hover, n)} x2={x(hover, n)} y1={0} y2={H} style={{ stroke: "rgb(var(--dx-ink))" }} strokeOpacity={0.4} strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
           )}
         </svg>
 
@@ -136,7 +136,7 @@ export function LineChart({
               />
             ))}
             <div
-              className="pointer-events-none absolute top-1 z-10 min-w-[130px] -translate-x-1/2 rounded-md border border-white/10 bg-[#0b0d16]/95 px-2.5 py-1.5 text-[11px] shadow-xl"
+              className="pointer-events-none absolute top-1 z-10 min-w-[130px] -translate-x-1/2 rounded-md border border-white/10 bg-dx-raise/95 px-2.5 py-1.5 text-[11px] shadow-xl"
               style={{ left: `${Math.min(90, Math.max(10, (hover / (n - 1)) * 100))}%` }}
             >
               <div className="dx-num mb-0.5 text-dx-dim">
@@ -205,7 +205,7 @@ export function BarChart({
               onPointerLeave={() => setHover(null)}
             >
               {hover === i && (
-                <div className="dx-num pointer-events-none absolute -top-0.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded border border-white/10 bg-[#0b0d16] px-1.5 py-0.5 text-[10px] text-dx-text">
+                <div className="dx-num pointer-events-none absolute -top-0.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded border border-white/10 bg-dx-raise px-1.5 py-0.5 text-[10px] text-dx-text">
                   {format(b.value)}
                   {b.sub && <span className="ml-1 text-dx-dim">{b.sub}</span>}
                 </div>
@@ -336,7 +336,7 @@ export function StackedBars({
           return (
             <div key={i} className="relative flex h-full flex-1 flex-col justify-end" onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
               {hover === i && (
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded border border-white/10 bg-[#0b0d16] px-2 py-1 text-[10.5px]">
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded border border-white/10 bg-dx-raise px-2 py-1 text-[10.5px]">
                   <div className="dx-num text-dx-text">{format(total)}</div>
                   {b.parts.map((p, j) => (
                     <div key={j} className="flex items-center gap-1.5 text-dx-dim">
