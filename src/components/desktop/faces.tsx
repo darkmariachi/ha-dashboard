@@ -439,6 +439,13 @@ export function SubjectFaces({ subject, name, color, visits = [] }: { subject: s
     load();
   }
 
+  /** "Not them": recorded, so automatic matching won't put it back. */
+  async function notThem(id: number) {
+    await rejectFaces(subject, [id]).catch(() => {});
+    avatarsChanged();
+    load();
+  }
+
   async function set(id: number, to: string | null) {
     await assignFaces([id], to).catch(() => {});
     avatarsChanged();
@@ -499,7 +506,7 @@ export function SubjectFaces({ subject, name, color, visits = [] }: { subject: s
                     <button onClick={() => set(f.id, subject)} title="Yes, that's them" className="text-dx-green">
                       <Check size={13} />
                     </button>
-                    <button onClick={() => set(f.id, null)} title="Not them" className="text-dx-red">
+                    <button onClick={() => notThem(f.id)} title="Not them" className="text-dx-red">
                       <X size={13} />
                     </button>
                   </>

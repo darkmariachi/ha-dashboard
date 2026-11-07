@@ -462,6 +462,14 @@ export function PersonFaces({ subject, name, visits = [] }: { subject: string; n
     load();
   }
 
+  /** "Not them": recorded, so automatic matching won't put it back. */
+  async function notThem(id: number) {
+    setOpen(null);
+    await rejectFaces(subject, [id]).catch(() => {});
+    avatarsChanged();
+    load();
+  }
+
   async function set(id: number, to: string | null) {
     setOpen(null);
     await assignFaces([id], to).catch(() => {});
@@ -525,7 +533,7 @@ export function PersonFaces({ subject, name, visits = [] }: { subject: string; n
               It's {name.split(" ")[0]}
             </button>
           )}
-          <button onClick={() => set(selected.id, null)} className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-[#ff6b6b]">
+          <button onClick={() => notThem(selected.id)} className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-[#ff6b6b]">
             Not {name.split(" ")[0]}
           </button>
         </div>

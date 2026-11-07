@@ -529,8 +529,9 @@ async def candidates(request: Request):
 
 @app.post("/reject")
 async def reject(request: Request):
-    """Mark faces as not this subject, so they stop being suggested (and
-    drop an automatic match to them if there was one)."""
+    """Mark faces as not this subject: they're taken off them (matched or
+    confirmed), stop being suggested for them, and re-matching never gives
+    them back to this subject (it may still match someone else)."""
     await require_ha_token(request)
     body = await request.json()
     subject = body.get("subject")
@@ -540,10 +541,13 @@ async def reject(request: Request):
     with db_lock:
         db.executemany("insert or ignore into rejections(subject, face_id) values (?, ?)", [(subject, i) for i in ids])
         db.executemany(
-            "update faces set subject = null, label = null, score = 0 where id = ? and subject = ? and label = 'auto'",
+            "update faces set subject = null, label = null, score = 0 where id = ? and subject = ?",
             [(i, subject) for i in ids],
         )
+        if ids:  # their profile picture falls back to the latest face
+            db.execute("delete from avatars where subject = ? and face_id in (%s)" % ",".join("?" * len(ids)), (subject, *ids))
         db.commit()
+    await asyncio.to_thread(rematch_all)
     return {"ok": True}
 
 

@@ -52,6 +52,10 @@ services:
     build:
       context: ./faces
     container_name: ha-dashboard-faces
+    # Inference would otherwise take all 4 of skylab's cores during a
+    # backfill (load ~5, starving HA, Plex and the game servers). Live
+    # detections jump the queue, so the cap only slows the backfill.
+    cpus: "2.0"
     environment:
       HA_URL: ${PUSH_HA_URL:-http://192.168.1.54:8123}
       HA_TOKEN: ${PUSH_HA_TOKEN:-}
