@@ -815,7 +815,10 @@ function PhoneSuggestions({
             <div className="min-w-0 flex-1">
               <div className="truncate text-dx-text">{d.name}</div>
               <div className="dx-num truncate text-[10px] text-dx-faint">
-                {d.hits}/{d.of} sightings · {d.visits} visits{net.ip ? ` · ${net.ip}` : ""}
+                {d.lastSeenAt
+                  ? `last on Wi-Fi ${new Date(d.lastSeenAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}, right after a sighting`
+                  : `${d.hits}/${d.of} sightings · ${d.visits} visits`}
+                {net.ip ? ` · ${net.ip}` : ""}
               </div>
             </div>
             <Btn

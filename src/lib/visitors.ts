@@ -159,13 +159,18 @@ export interface DeviceSuggestion {
   of: number;
   /** The device's own visit count (lots of other visits = weaker hint). */
   visits: number;
+  /** No recorded visit overlaps (the visit log started after); the device's
+   * last time on the Wi-Fi was right around a sighting instead. */
+  lastSeenAt?: number;
 }
 
 /**
  * Unlinked devices that were on the Wi-Fi while this person was seen at the
  * door: the reverse of the faces-from-Wi-Fi suggestions. Skips devices that
  * belong to someone (visitor or household), dismissed ones, and anything
- * that was on for days at a stretch (it lives here).
+ * that was on for days at a stretch (it lives here). For visits older than
+ * the visit log, a device last seen within an hour after a sighting counts
+ * as a weaker hint (info.ipAt is UniFi's last-seen time).
  */
 export function deviceSuggestions(
   person: Visitor,
@@ -177,9 +182,11 @@ export function deviceSuggestions(
   const cams = cameraVisits(seen[person.id]);
   if (cams.length === 0) return [];
   const owned = new Set(log.people.flatMap((p) => p.devices));
+  const ids = new Set([...Object.keys(log.sessions), ...Object.keys(log.info ?? {})]);
   const out: DeviceSuggestion[] = [];
-  for (const [id, sessions] of Object.entries(log.sessions)) {
+  for (const id of ids) {
     if (owned.has(id) || household.has(id) || log.hidden.includes(id)) continue;
+    const sessions = log.sessions[id] ?? [];
     const hits = cams.filter((c) =>
       sessions.some((s) => {
         const end = s.end ?? now;
@@ -187,7 +194,15 @@ export function deviceSuggestions(
         return s.start - MERGE_SLACK <= (c.end ?? now) && end + 5 * 60_000 >= c.start;
       }),
     ).length;
-    if (hits > 0) out.push({ id, name: log.names[id] ?? id, hits, of: cams.length, visits: visitsOf([id], log.sessions).length });
+    const base = { id, name: log.names[id] ?? id, of: cams.length, visits: visitsOf([id], log.sessions).length };
+    if (hits > 0) {
+      out.push({ ...base, hits });
+      continue;
+    }
+    const last = log.info?.[id]?.ipAt;
+    if (last && cams.some((c) => last >= c.start - MERGE_SLACK && last <= (c.end ?? now) + 60 * 60_000)) {
+      out.push({ ...base, hits: 1, lastSeenAt: last });
+    }
   }
-  return out.sort((a, b) => b.hits - a.hits || a.visits - b.visits).slice(0, 6);
+  return out.sort((a, b) => b.hits - a.hits || Number(!!a.lastSeenAt) - Number(!!b.lastSeenAt) || a.visits - b.visits).slice(0, 6);
 }

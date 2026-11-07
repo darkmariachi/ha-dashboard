@@ -671,7 +671,9 @@ export function DeviceSuggestions({
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-text">{d.name}</div>
             <div className="text-xs text-text-dim">
-              On the Wi-Fi {d.hits} of {d.of} {d.of === 1 ? "time" : "times"} {first} was seen · {d.visits} {d.visits === 1 ? "visit" : "visits"} overall
+              {d.lastSeenAt
+                ? `Last on the Wi-Fi ${new Date(d.lastSeenAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, right after ${first} was seen`
+                : `On the Wi-Fi ${d.hits} of ${d.of} ${d.of === 1 ? "time" : "times"} ${first} was seen · ${d.visits} ${d.visits === 1 ? "visit" : "visits"} overall`}
             </div>
           </div>
           <button
