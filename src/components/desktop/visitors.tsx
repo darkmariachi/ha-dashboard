@@ -331,7 +331,8 @@ function VisitorDetail({
       </div>
 
       <div className="mt-4">
-        <SubjectFaces subject={person.id} name={person.name} color={color} visits={visits} />
+        {/* Wi-Fi visits only: these are the times their phone puts them here. */}
+        <SubjectFaces subject={person.id} name={person.name} color={color} visits={visitsOf(person.devices, log.sessions)} />
       </div>
 
       <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">

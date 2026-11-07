@@ -79,6 +79,7 @@ MAX_YAW = 55  # degrees; profiles don't match well
 OFFSETS: dict[str, tuple[int, ...]] = {"camera.g4_doorbell_pro_medium": (0, 2000)}
 MATCH = 0.42  # cosine similarity to call it the same person
 NEAREST = 0.28  # below MATCH: only a "looks like" hint on an unnamed group
+CANDIDATE_MIN = 0.15  # per-visitor suggestions below this likeness are dropped
 CLUSTER = 0.50  # similarity that links two unlabelled faces in a cluster
 PACE_S = 0.25  # pause between queue items (Protect exports each frame)
 
@@ -657,6 +658,10 @@ async def candidates(request: Request):
         E = np.stack([np.frombuffer(r["emb"], dtype=np.float32) for r in rows])
         sims = (E @ M.T).max(axis=1).tolist()
     out = [{**face_json(r), "sim": None if s is None else round(float(s), 3)} for r, s in zip(rows, sims)]
+    if mine:
+        # With confirmed faces to compare against, faces that look nothing
+        # like them are someone else who was around (companions, family).
+        out = [f for f in out if f["sim"] >= CANDIDATE_MIN]
     out.sort(key=lambda f: (f["sim"] if f["sim"] is not None else -1, f["t"]), reverse=True)
     return out[: int(body.get("limit", 60))]
 

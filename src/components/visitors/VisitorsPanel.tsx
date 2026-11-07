@@ -384,7 +384,8 @@ function PersonSheet({
       }
       onClose={onClose}
     >
-      <PersonFaces subject={person.id} name={person.name} visits={visits} />
+      {/* Wi-Fi visits only: these are the times their phone puts them here. */}
+      <PersonFaces subject={person.id} name={person.name} visits={visitsOf(person.devices, log.sessions)} />
 
       <VisitHistory visits={visits} now={now} limit={20} />
 
