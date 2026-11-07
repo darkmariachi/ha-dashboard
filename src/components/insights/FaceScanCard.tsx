@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, ScanFace } from "lucide-react";
-import { camLabel, faceStats, type FaceStats } from "../../lib/faces";
+import { camLabel, faceStats, frameError, type FaceStats } from "../../lib/faces";
 
 const ACCENT = "#7c5fc4";
 const GREEN = "#2fae7e";
@@ -190,7 +190,7 @@ export function FaceScanCard({ index = 0 }: { index?: number }) {
           <AlertTriangle size={14} className="mt-px shrink-0" />
           <span>
             {s.queue.failed} {s.queue.failed === 1 ? "frame" : "frames"} couldn't be fetched after 3 tries
-            {s.errors[0] && ` · last: ${s.errors[0].error.slice(0, 90)}`}
+            {s.errors[0] && ` · last: ${frameError(s.errors[0].error)}`}
           </span>
         </div>
       )}

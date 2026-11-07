@@ -109,6 +109,14 @@ export interface FaceStats {
 }
 export const faceStats = () => call<FaceStats>("stats");
 
+/** A queue error in plain words (they're raw HTTP errors with long URLs). */
+export function frameError(error: string) {
+  if (/404/.test(error)) return "Protect had no recording at that moment";
+  if (/timed? ?out/i.test(error)) return "Protect took too long to answer";
+  if (/5\d\d/.test(error)) return "Home Assistant or Protect returned an error";
+  return error.slice(0, 90);
+}
+
 /** HA path of the full camera frame a face was cut from (the service
  * looked at the detection time + 1 s); null for uploaded photos. Sign it
  * with HA (SignedImg) to show it. */

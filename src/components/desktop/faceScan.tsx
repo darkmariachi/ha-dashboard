@@ -1,5 +1,5 @@
 import { ScanFace } from "lucide-react";
-import { camLabel } from "../../lib/faces";
+import { camLabel, frameError } from "../../lib/faces";
 import { useFaceStats } from "../insights/FaceScanCard";
 import { BarChart } from "./charts";
 import { dur } from "./data";
@@ -105,7 +105,7 @@ export function FaceScanPanel({ delay = 0 }: { delay?: number }) {
               dot={s.queue.failed ? C.amber : C.green}
             />
           </div>
-          {s.errors[0] && <div className="dx-num truncate text-[10.5px] text-dx-amber" title={s.errors[0].error}>last error: {s.errors[0].error}</div>}
+          {s.errors[0] && <div className="dx-num truncate text-[10.5px] text-dx-amber" title={s.errors[0].error}>last error: {frameError(s.errors[0].error)}</div>}
         </div>
       </div>
 
