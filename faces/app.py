@@ -39,10 +39,15 @@ import threading
 import time
 from datetime import datetime, timezone
 
-import cv2
-import httpx
-import numpy as np
-from fastapi import FastAPI, HTTPException, Request
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+import cv2  # noqa: E402
+import httpx  # noqa: E402
+import numpy as np  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 
 HA_URL = os.environ.get("HA_URL", "http://192.168.1.54:8123").rstrip("/")
 HA_TOKEN = os.environ.get("HA_TOKEN", "")
@@ -58,9 +63,14 @@ SOURCES: dict[str, tuple[str, set[str] | None]] = {
     "event.driveway_smart_detection": ("camera.driveway_medium", {"person"}),
 }
 
-MIN_DET = 0.72  # detector confidence
-MIN_SIZE = 36  # face box width in px, at 1920 wide
+# Tuned on real doorbell frames (1600x1200): faces at the door are ~50 px
+# wide and score 0.55-0.8; profiles are what MAX_YAW is for.
+MIN_DET = 0.60  # detector confidence
+MIN_SIZE = 40  # face box width in px
 MAX_YAW = 55  # degrees; profiles don't match well
+# Frames per detection, as ms after it (on top of fetch_frame's +1 s):
+# people often aren't facing the doorbell yet when Protect first flags them.
+OFFSETS: dict[str, tuple[int, ...]] = {"camera.g4_doorbell_pro_medium": (0, 2000)}
 MATCH = 0.42  # cosine similarity to call it the same person
 CLUSTER = 0.50  # similarity that links two unlabelled faces in a cluster
 PACE_S = 0.25  # pause between queue items (Protect exports each frame)
@@ -110,6 +120,11 @@ def enqueue(camera: str, t: int, kind: str, prio: int) -> bool:
         )
         db.commit()
         return cur.rowcount > 0
+
+
+def enqueue_detection(camera: str, t: int, kind: str, prio: int) -> int:
+    """Queue every frame we look at for one detection; returns how many were new."""
+    return sum(enqueue(camera, t + off, kind, prio) for off in OFFSETS.get(camera, (0,)))
 
 
 # -------------------------------------------------------------------- model
@@ -305,7 +320,7 @@ async def watch_ha():
                         t = int(datetime.fromisoformat(new["state"]).timestamp() * 1000)
                     except (ValueError, TypeError):
                         continue
-                    if enqueue(camera, t, "ring" if kinds is None else kind, prio=10):
+                    if enqueue_detection(camera, t, "ring" if kinds is None else kind, prio=10):
                         log.info("queued live %s %s", camera, kind)
         except Exception as e:  # noqa: BLE001
             log.warning("HA socket: %s", e)
@@ -517,8 +532,8 @@ def backfill(path: str):
     for it in items:
         if it.get("kind") not in ("person", "ring"):
             continue
-        added += enqueue(it["camera"], int(it["t"]), it["kind"], prio=0)
-    print(f"queued {added} of {len(items)} ({len(items) - added} duplicates or skipped)")
+        added += enqueue_detection(it["camera"], int(it["t"]), it["kind"], prio=0)
+    print(f"queued {added} frames for {len(items)} detections")
 
 
 if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "backfill":
