@@ -128,6 +128,14 @@ export function framePath(f: Pick<Face, "camera" | "t">, width = 1280) {
   return `/api/unifiprotect/snapshot/${PROTECT_ENTRY_ID}/${f.camera}/${iso}?width=${width}`;
 }
 
+/** HA path of the Protect recording around a face: `before` seconds before
+ * the sighting to `after` seconds after (MP4, needs signing). */
+export function clipPath(f: Pick<Face, "camera" | "t">, before = 4, after = 12) {
+  if (f.camera === "upload") return null;
+  const iso = (ms: number) => new Date(Math.round(ms / 1000) * 1000).toISOString().replace(".000Z", "Z");
+  return `/api/unifiprotect/video/${PROTECT_ENTRY_ID}/${f.camera}/${iso(f.t - before * 1000)}/${iso(f.t + after * 1000)}`;
+}
+
 /** An unnamed face from while a visitor was around; `sim` is how much it
  * resembles their confirmed faces (null when they have none yet). */
 export interface Candidate extends Face {
