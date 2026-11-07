@@ -43,3 +43,18 @@ services:
     ports:
       - "192.168.1.54:8094:8082"
     restart: unless-stopped
+
+  # Face recognition for the Visitors page (faces/app.py): watches HA for
+  # Protect person detections and doorbell rings, keeps face crops and
+  # embeddings in faces-data/faces.db. Only reachable through the
+  # dashboard's nginx at /api/faces/ (no published port).
+  faces:
+    build:
+      context: ./faces
+    container_name: ha-dashboard-faces
+    environment:
+      HA_URL: ${PUSH_HA_URL:-http://192.168.1.54:8123}
+      HA_TOKEN: ${PUSH_HA_TOKEN:-}
+    volumes:
+      - ./faces-data:/data
+    restart: unless-stopped

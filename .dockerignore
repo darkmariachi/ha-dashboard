@@ -8,3 +8,5 @@ dist-ssr
 push/node_modules
 push-data
 tv
+faces-data
+faces/__pycache__

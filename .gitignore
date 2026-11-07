@@ -27,3 +27,4 @@ dist-ssr
 # Push service
 push/node_modules
 push-data
+faces-data/
