@@ -1,3 +1,5 @@
+import { loadCredentials } from "../ha/connection";
+
 export interface SpotifyTrack {
   id: string;
   uri: string;
@@ -19,9 +21,15 @@ let cachedToken: { value: string; expiresAt: number } | null = null;
  */
 async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
+  // The proxy only answers callers holding a valid HA token.
+  const haToken = loadCredentials()?.token;
+  if (!haToken) throw new Error("Sign in to Home Assistant to search Spotify.");
   const res = await fetch("/api/spotify-token", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Bearer ${haToken}`,
+    },
     body: "grant_type=client_credentials",
   });
   if (!res.ok) {

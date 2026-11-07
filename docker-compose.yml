@@ -8,6 +8,8 @@ services:
     environment:
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      # nginx checks HA tokens here before handing out Spotify tokens.
+      HA_URL: ${PUSH_HA_URL:-http://192.168.1.54:8123}
     ports:
       - "8081:80"
     restart: unless-stopped
