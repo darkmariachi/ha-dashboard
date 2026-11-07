@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import clsx from "clsx";
-import { Bell, CalendarDays, Check, Clock, ExternalLink, EyeOff, History, Loader2, Smartphone, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Bell, CalendarDays, Cctv, Check, Clock, ExternalLink, EyeOff, History, Link2, Loader2, Smartphone, Trash2, UserPlus, Users, X } from "lucide-react";
 import type { HassEntities } from "home-assistant-js-websocket";
 import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
 import { UNIFI_NETWORK } from "../../config/desktop";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
 import {
+  allVisits,
   deleteVisitor,
+  deviceSuggestions,
   fetchVisitLog,
   hideDevice,
   saveVisitor,
@@ -20,7 +22,7 @@ import {
 } from "../../lib/visitors";
 import { Timeline } from "./charts";
 import { FaceReview, SubjectFaces } from "./faces";
-import { useAvatars } from "../../lib/useFaceNames";
+import { useAvatars, useFaceSeen } from "../../lib/useFaceNames";
 import { dur } from "./data";
 import { Big, Btn, C, Dot, Label, Panel, Switch } from "./ui";
 
@@ -212,6 +214,7 @@ function VisitorDetail({
   log,
   color,
   isHere,
+  household,
   now,
   onChanged,
   onRemoved,
@@ -220,6 +223,7 @@ function VisitorDetail({
   log: VisitLog;
   color: string;
   isHere: (id: string) => boolean;
+  household: Set<string>;
   now: number;
   onChanged: () => Promise<unknown>;
   onRemoved: () => void;
@@ -229,13 +233,14 @@ function VisitorDetail({
   const [name, setName] = useState(person.name);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [seen, setSeen] = useState(person.id);
-  if (seen !== person.id) {
-    setSeen(person.id);
+  const [shownId, setShownId] = useState(person.id);
+  if (shownId !== person.id) {
+    setShownId(person.id);
     setName(person.name);
     setConfirm(false);
   }
-  const visits = visitsOf(person.devices, log.sessions);
+  const seen = useFaceSeen();
+  const visits = allVisits(person, log, seen);
   const here = person.devices.some(isHere);
   const from = now - WINDOW_DAYS * DAY;
   const month = within(visits, from, now);
@@ -339,7 +344,12 @@ function VisitorDetail({
                 {visits.slice(0, 80).map((v) => (
                   <tr key={v.start} className="border-b border-dashed border-dx-line last:border-0">
                     <td className="py-1.5 pr-3 text-dx-dim">{day(v.start)}</td>
-                    <td className="dx-num px-2 text-dx-text">{hhmm(v.start)}</td>
+                    <td className="dx-num px-2 text-dx-text">
+                      {hhmm(v.start)}
+                      {(v.source === "camera" || v.source === "both") && (
+                        <Cctv size={11} className="ml-1.5 inline text-dx-violet" aria-label={v.source === "camera" ? "seen at the door" : "seen at the door and on Wi-Fi"} />
+                      )}
+                    </td>
                     <td className="dx-num px-2 text-dx-text">{v.end === null ? <span className="text-dx-green">now</span> : hhmm(v.end)}</td>
                     <td className="dx-num py-1.5 pl-2 text-right" style={{ color }}>
                       {dur((v.end ?? now) - v.start)}
@@ -416,6 +426,7 @@ function VisitorDetail({
             );
           })}
           <p className="mt-2 text-[10.5px] leading-snug text-dx-faint">New phone? Assign it from New devices.</p>
+          <PhoneSuggestions person={person} log={log} seen={seen} household={household} now={now} onChanged={onChanged} />
         </div>
       </div>
     </Panel>
@@ -493,6 +504,7 @@ export function VisitorsConsole() {
   const { entities } = useHa();
   const nowDate = useNow(60_000);
   const avatars = useAvatars();
+  const seen = useFaceSeen();
   const now = nowDate.getTime();
   const [log, setLog] = useState<VisitLog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -532,9 +544,9 @@ export function VisitorsConsole() {
   const people = useMemo(() => {
     if (!log) return [];
     return log.people
-      .map((p, i) => ({ person: p, visits: visitsOf(p.devices, log.sessions), here: p.devices.some(isHere), color: PALETTE[i % PALETTE.length] }))
+      .map((p, i) => ({ person: p, visits: allVisits(p, log, seen), here: p.devices.some(isHere), color: PALETTE[i % PALETTE.length] }))
       .sort((a, b) => Number(b.here) - Number(a.here) || (b.visits[0]?.start ?? 0) - (a.visits[0]?.start ?? 0));
-  }, [log, isHere]);
+  }, [log, isHere, seen]);
 
   const newDevices = useMemo(() => {
     if (!log) return [];
@@ -740,6 +752,7 @@ export function VisitorsConsole() {
               log={log}
               color={sel.color}
               isHere={isHere}
+              household={household}
               now={now}
               onChanged={refresh}
               onRemoved={() => setSelected(null)}
@@ -766,5 +779,60 @@ export function VisitorsConsole() {
         </Panel>
       )}
     </>
+  );
+}
+
+/** Unlinked phones that were on the Wi-Fi while this person was seen at the
+ * door; Link adds the phone to them. */
+function PhoneSuggestions({
+  person,
+  log,
+  seen,
+  household,
+  now,
+  onChanged,
+}: {
+  person: Visitor;
+  log: VisitLog;
+  seen: Record<string, number[]>;
+  household: Set<string>;
+  now: number;
+  onChanged: () => Promise<unknown>;
+}) {
+  const { entities } = useHa();
+  const [busy, setBusy] = useState<string | null>(null);
+  const list = useMemo(() => deviceSuggestions(person, log, seen, household, now), [person, log, seen, household, now]);
+  if (list.length === 0) return null;
+  const first = person.name.split(" ")[0];
+  return (
+    <div className="mt-3 rounded-md border border-dashed border-dx-violet/40 bg-dx-violet/[0.04] p-2">
+      <Label className="mb-1 text-dx-violet">Phones here when {first} was at the door</Label>
+      {list.map((d) => {
+        const net = netOf(d.id, log, entities);
+        return (
+          <div key={d.id} className="flex items-center gap-2 border-b border-dashed border-dx-line py-1.5 text-[11.5px] last:border-0">
+            <Smartphone size={12} className="shrink-0 text-dx-faint" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-dx-text">{d.name}</div>
+              <div className="dx-num truncate text-[10px] text-dx-faint">
+                {d.hits}/{d.of} sightings · {d.visits} visits{net.ip ? ` · ${net.ip}` : ""}
+              </div>
+            </div>
+            <Btn
+              color={C.violet}
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy(d.id);
+                await saveVisitor({ ...person, devices: [...person.devices, d.id] }).catch(() => {});
+                await onChanged();
+                setBusy(null);
+              }}
+            >
+              {busy === d.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />} Link
+            </Btn>
+          </div>
+        );
+      })}
+    </div>
   );
 }

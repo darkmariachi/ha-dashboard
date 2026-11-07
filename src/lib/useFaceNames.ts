@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { HOUSEHOLD_PEOPLE } from "../config/curatedHome";
 import { useHa } from "../ha/HaProvider";
-import { faceSightings, faceSubjects, householdName, subjectName, type FaceSubject, type Sighting } from "./faces";
+import { faceSeen, faceSightings, faceSubjects, householdName, subjectName, type FaceSubject, type Sighting } from "./faces";
 import { fetchVisitLog, type VisitLog } from "./visitors";
 
 /**
@@ -52,18 +52,23 @@ export function useFaceNames(hours: number) {
 // each face card, avatars in lists), refreshed every few minutes and when
 // avatarsChanged() fires.
 type Subjects = Record<string, FaceSubject>;
+type Seen = Record<string, number[]>;
 let subjectsCache: Subjects = {};
+let seenCache: Seen = {};
 const listeners = new Set<(s: Subjects) => void>();
+const seenListeners = new Set<(s: Seen) => void>();
 let inflight: Promise<void> | null = null;
 let loadedAt = 0;
 
 function loadSubjects(force = false) {
   if (inflight || (!force && Date.now() - loadedAt < 5 * 60_000)) return;
-  inflight = faceSubjects()
-    .then((list) => {
+  inflight = Promise.all([faceSubjects(), faceSeen().catch(() => seenCache)])
+    .then(([list, seen]) => {
       subjectsCache = Object.fromEntries(list.map((s) => [s.subject, s]));
+      seenCache = seen;
       loadedAt = Date.now();
       listeners.forEach((l) => l(subjectsCache));
+      seenListeners.forEach((l) => l(seenCache));
     })
     .catch(() => {})
     .finally(() => {
@@ -90,6 +95,20 @@ export function useAvatars(): Subjects {
     };
   }, []);
   return subjects;
+}
+
+/** When each named person was seen on camera (for camera-based visits);
+ * shares the avatars' fetch and refresh. */
+export function useFaceSeen(): Seen {
+  const [seen, setSeen] = useState<Seen>(seenCache);
+  useEffect(() => {
+    seenListeners.add(setSeen);
+    loadSubjects();
+    return () => {
+      seenListeners.delete(setSeen);
+    };
+  }, []);
+  return seen;
 }
 
 /** Household names for the who-is-this pickers: the HA people's first

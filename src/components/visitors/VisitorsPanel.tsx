@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { Bell, BellOff, Loader2, Smartphone, Trash2, UserPlus, X } from "lucide-react";
+import { Bell, BellOff, Cctv, Loader2, Smartphone, Trash2, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
@@ -13,14 +13,15 @@ import {
   fetchVisitLog,
   hideDevice,
   saveVisitor,
+  allVisits,
   visitsOf,
   type Session,
   type VisitLog,
   type Visitor,
 } from "../../lib/visitors";
 import { Sheet } from "../home/Sheet";
-import { FaceReviewSection, PersonFaces } from "./Faces";
-import { useAvatars } from "../../lib/useFaceNames";
+import { DeviceSuggestions, FaceReviewSection, PersonFaces } from "./Faces";
+import { useAvatars, useFaceSeen } from "../../lib/useFaceNames";
 
 const HOME_GREEN = "#3ee08f";
 const ACCENT = "#4f79c9";
@@ -81,6 +82,7 @@ function lastSeenText(visits: Session[], here: boolean, now: Date) {
 export function VisitorsPanel() {
   const { entities } = useHa();
   const avatars = useAvatars();
+  const seen = useFaceSeen();
   const now = useNow(60_000);
   const [log, setLog] = useState<VisitLog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,9 +126,9 @@ export function VisitorsPanel() {
   const people = useMemo(() => {
     if (!log) return [];
     return log.people
-      .map((p) => ({ person: p, visits: visitsOf(p.devices, log.sessions), here: p.devices.some(isHere) }))
+      .map((p) => ({ person: p, visits: allVisits(p, log, seen), here: p.devices.some(isHere) }))
       .sort((a, b) => (a.visits[0]?.start ?? 0) < (b.visits[0]?.start ?? 0) ? 1 : -1);
-  }, [log, isHere]);
+  }, [log, isHere, seen]);
 
   const newDevices = useMemo(() => {
     if (!log) return [];
@@ -243,6 +245,7 @@ export function VisitorsPanel() {
           person={person}
           log={log}
           isHere={isHere}
+          household={household}
           now={now}
           onClose={() => setOpenPerson(null)}
           onChanged={refresh}
@@ -313,8 +316,13 @@ function VisitHistory({ visits, now, limit }: { visits: Session[]; now: Date; li
           <div className="flex flex-col gap-1 rounded-2xl bg-chip px-4 py-2.5">
             {d.visits.map((v) => (
               <div key={v.start} className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="text-text">
+                <span className="flex items-center gap-1.5 text-text">
                   {clock(v.start)} – {v.end === null ? <span style={{ color: HOME_GREEN }}>now</span> : clock(v.end)}
+                  {(v.source === "camera" || v.source === "both") && (
+                    <span title={v.source === "camera" ? "Seen at the door (no phone on the Wi-Fi)" : "Seen at the door, and on the Wi-Fi"}>
+                      <Cctv size={13} className="text-text-dim" />
+                    </span>
+                  )}
                 </span>
                 <span className="text-text-dim">{duration((v.end ?? now.getTime()) - v.start)}</span>
               </div>
@@ -336,6 +344,7 @@ function PersonSheet({
   person,
   log,
   isHere,
+  household,
   now,
   onClose,
   onChanged,
@@ -343,14 +352,16 @@ function PersonSheet({
   person: Visitor;
   log: VisitLog;
   isHere: (id: string) => boolean;
+  household: Set<string>;
   now: Date;
   onClose: () => void;
   onChanged: () => Promise<unknown>;
 }) {
+  const seen = useFaceSeen();
   const [name, setName] = useState(person.name);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const visits = visitsOf(person.devices, log.sessions);
+  const visits = allVisits(person, log, seen);
   const here = person.devices.some(isHere);
   const month = visits.filter((v) => (v.end ?? now.getTime()) >= now.getTime() - 30 * DAY_MS);
   const monthTime = month.reduce((sum, v) => sum + ((v.end ?? now.getTime()) - v.start), 0);
@@ -417,6 +428,7 @@ function PersonSheet({
             ))}
           </div>
           <p className="mt-1.5 text-xs text-text-dim">New phone? Tap it under New devices and add it to {person.name}.</p>
+          <DeviceSuggestions person={person} log={log} seen={seen} household={household} now={now.getTime()} onChanged={onChanged} />
         </div>
 
         <button

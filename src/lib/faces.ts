@@ -82,6 +82,8 @@ export const faceClusters = (limit = 40) => call<FaceCluster[]>(`clusters?limit=
 export const faceSubjects = () => call<FaceSubject[]>("subjects");
 export const facesOf = (subject: string, limit = 60) => call<Face[]>(`faces?subject=${encodeURIComponent(subject)}&limit=${limit}`);
 export const faceSightings = (since: number) => call<Sighting[]>(`sightings?since=${since}`);
+/** When each named subject was seen on camera (ms, oldest first). */
+export const faceSeen = () => call<Record<string, number[]>>("seen");
 export const assignFaces = (ids: number[], subject: string | null) => call<{ ok: true }>("assign", { ids, subject });
 export const enrollFace = (subject: string, image: string) => call<{ ok: true; faces_in_photo: number }>("enroll", { subject, image });
 export const setAvatar = (subject: string, id: number | null) => call<{ ok: true }>("avatar", { subject, id });

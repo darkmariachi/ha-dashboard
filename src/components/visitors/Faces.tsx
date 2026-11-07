@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, Trash2, Wifi, X } from "lucide-react";
+import { Check, EyeOff, ImagePlus, Link2, Loader2, ScanFace, Smartphone, Sparkles, Star, Trash2, Wifi, X } from "lucide-react";
 import { DeleteFaceSheet, FaceViewer } from "./FaceViewer";
 import { Sheet } from "../home/Sheet";
 import {
@@ -25,7 +25,7 @@ import {
 } from "../../lib/faces";
 import { avatarsChanged, useAvatars, useHouseholdNames } from "../../lib/useFaceNames";
 import { useNow } from "../../lib/useNow";
-import { saveVisitor, type Session, type VisitLog } from "../../lib/visitors";
+import { deviceSuggestions, saveVisitor, type Session, type VisitLog, type Visitor } from "../../lib/visitors";
 
 // Touch versions of the desktop face tools, in the phone / tablet glass
 // style: name the unknown face groups the face service found, and see /
@@ -624,5 +624,66 @@ export function PersonFaces({ subject, name, visits = [] }: { subject: string; n
       )}
       {viewing && <FaceViewer face={viewing} detail={viewing.label === "auto" ? <div>Matched {Math.round(viewing.score * 100)}%</div> : null} onClose={() => setViewing(null)} />}
     </section>
+  );
+}
+
+/**
+ * The reverse of the Wi-Fi face suggestions: unlinked phones that were on
+ * the Wi-Fi while this person was seen at the door. One tap links it, after
+ * which their Wi-Fi visits count too.
+ */
+export function DeviceSuggestions({
+  person,
+  log,
+  seen,
+  household,
+  now,
+  onChanged,
+}: {
+  person: Visitor;
+  log: VisitLog;
+  seen: Record<string, number[]>;
+  household: Set<string>;
+  now: number;
+  onChanged: () => Promise<unknown> | void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const list = useMemo(() => deviceSuggestions(person, log, seen, household, now), [person, log, seen, household, now]);
+  if (list.length === 0) return null;
+  const first = person.name.split(" ")[0];
+
+  async function link(id: string) {
+    setBusy(id);
+    await saveVisitor({ ...person, devices: [...person.devices, id] }).catch(() => {});
+    navigator.vibrate?.(10);
+    await onChanged();
+    setBusy(null);
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-2xl p-3" style={{ background: "var(--chip-off)" }}>
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-text">
+        <ScanFace size={14} style={{ color: ACCENT }} /> Phones here when {first} was at the door
+      </div>
+      {list.map((d) => (
+        <div key={d.id} className="flex items-center gap-3">
+          <Smartphone size={16} className="shrink-0 text-text-dim" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium text-text">{d.name}</div>
+            <div className="text-xs text-text-dim">
+              On the Wi-Fi {d.hits} of {d.of} {d.of === 1 ? "time" : "times"} {first} was seen · {d.visits} {d.visits === 1 ? "visit" : "visits"} overall
+            </div>
+          </div>
+          <button
+            onClick={() => link(d.id)}
+            disabled={busy !== null}
+            className="flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-white active:scale-95 disabled:opacity-50"
+            style={{ background: ACCENT }}
+          >
+            {busy === d.id ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />} Link
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }

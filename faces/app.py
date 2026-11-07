@@ -22,6 +22,7 @@ Assistant token as a Bearer header, checked against HA):
   GET  /subjects                     per-subject counts, last seen, a sample
   GET  /faces?subject=&limit=&offset=
   GET  /sightings?since=             labelled faces after a time (ms)
+  GET  /seen                         {subject: [times]} for camera-based visits
   POST /assign   {ids: [..], subject: str | null}
   POST /enroll   {subject, image: data URL}   reference photo upload
   POST /avatar   {subject, id | null}         choose / clear a profile picture
@@ -723,6 +724,23 @@ async def sightings(request: Request, since: int = 0):
             (since,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+@app.get("/seen")
+async def seen(request: Request):
+    """When each named subject was seen on camera (ms, oldest first): the
+    dashboard turns these into visits alongside Wi-Fi ones. Uploaded photos
+    and ignored faces don't count."""
+    await require_ha_token(request)
+    with db_lock:
+        rows = db.execute(
+            "select subject, t from faces where subject is not null and subject != 'ignore'"
+            " and camera != 'upload' order by t"
+        ).fetchall()
+    out: dict[str, list[int]] = {}
+    for r in rows:
+        out.setdefault(r["subject"], []).append(r["t"])
+    return out
 
 
 @app.post("/assign")
