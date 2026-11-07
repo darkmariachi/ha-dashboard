@@ -1,8 +1,6 @@
 import { createElement, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import clsx from "clsx";
-import { BarChart3, Cctv, Droplets, HardDrive, House, Lightbulb, Moon, Power, X } from "lucide-react";
-import type { CuratedComputer } from "../../config/computers";
+import { BarChart3, Cctv, Droplets, House, Lightbulb, Power, X } from "lucide-react";
 import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
 import { DESKTOP_INDOOR } from "../../config/desktop";
 import { INSIGHT_LIGHTS, INSIGHTS_REFRESH_MS } from "../../config/insights";
@@ -14,8 +12,8 @@ import { useEntityHistory } from "../home/useEntityHistory";
 import { useStateHistory } from "../home/useStateHistory";
 import { addSpan } from "../devices/screenTime";
 import { BarChart, LineChart, Timeline } from "./charts";
-import { clock, computerOnline, dur, fmtW, isLive, num, SENSE, senseDevices, spans } from "./data";
-import { Big, Btn, C, Dot, HBar, KV, Label, Panel, Ring, Segmented } from "./ui";
+import { clock, dur, fmtW, num, SENSE, senseDevices, spans } from "./data";
+import { Big, C, Dot, HBar, KV, Label, Panel, Segmented } from "./ui";
 
 /* --------------------------------------------------- Energy breakdown */
 
@@ -120,122 +118,6 @@ export function IndoorPanel({ delay = 0, className }: { delay?: number; classNam
       <LineChart hours={24} height={110} format={(v) => `${v.toFixed(1)}°`} series={temp ? [{ label: "Temp", values: temp, color: C.violet, fill: true }] : []} />
       <Label className="mb-1 mt-3">Humidity</Label>
       <LineChart hours={24} height={80} format={(v) => `${Math.round(v)}%`} series={rh ? [{ label: "RH", values: rh, color: C.cyan, fill: true }] : []} />
-    </Panel>
-  );
-}
-
-/* ----------------------------------------------------------- Computers */
-
-function meterValue(m: { entityId: string; attribute?: string; invert?: boolean }, entities: ReturnType<typeof useHa>["entities"]) {
-  const e = entities[m.entityId];
-  const raw = m.attribute ? parseFloat(String(e?.attributes[m.attribute])) : num(e);
-  if (raw === null || !Number.isFinite(raw)) return null;
-  return m.invert ? 100 - raw : raw;
-}
-
-export function ComputerPanel({ computer: c, index }: { computer: CuratedComputer; index: number }) {
-  const { entities, callService } = useHa();
-  const now = useNow(30_000);
-  const [armed, setArmed] = useState<string | null>(null);
-  useEffect(() => {
-    if (!armed) return;
-    const t = setTimeout(() => setArmed(null), 3000);
-    return () => clearTimeout(t);
-  }, [armed]);
-  const online = computerOnline(c, entities);
-  const live = online || !!c.activity;
-  const colors = [C.cyan, C.pink, C.violet, C.green];
-  const anything = [c.onlineEntity, ...c.meters.map((m) => m.entityId)].some((id) => entities[id]);
-  const idle = c.idle && entities[c.idle.entityId]?.state === "on";
-
-  function fact(f: CuratedComputer["facts"][number]) {
-    const e = entities[f.entityId];
-    if (!isLive(e)) return "—";
-    if (f.format === "value") return e!.state;
-    const t = new Date(e!.state).getTime();
-    if (!Number.isFinite(t)) return e!.state;
-    return f.format === "since" ? dur(now.getTime() - t) : `${dur(now.getTime() - t)} ago`;
-  }
-
-  return (
-    <Panel
-      title={`${c.name} · ${c.subtitle}`}
-      icon={c.icon}
-      accent={colors[index % 4]}
-      delay={index * 40}
-      right={
-        <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: online ? (idle ? C.amber : C.green) : C.faint }}>
-          <Dot color={online ? (idle ? C.amber : C.green) : C.faint} pulse={online && !idle} />
-          {online ? (c.activity ? c.activity.on : idle ? "Idle" : "Online") : c.activity ? c.activity.off : "Offline"}
-        </span>
-      }
-    >
-      {!anything ? (
-        <div className="py-4 text-[12px] text-dx-dim">{c.setupHint}</div>
-      ) : (
-        <div className="flex gap-5">
-          <div className={clsx("flex gap-3", !live && "opacity-35")}>
-            {c.meters.slice(0, 3).map((m, i) => (
-              <Ring key={m.entityId} value={live ? meterValue(m, entities) : null} label={m.label} color={m.lowIsBad ? C.green : colors[(index + i) % 4]} size={78} />
-            ))}
-          </div>
-          <div className="min-w-0 flex-1">
-            {c.facts.map((f) => (
-              <KV key={f.label} k={f.label} v={fact(f)} />
-            ))}
-            {c.badges
-              ?.filter((b) => entities[b.entityId]?.state === "on")
-              .map((b) => <KV key={b.entityId} k={b.label} dot={C.red} v="ACTIVE" color={C.red} />)}
-          </div>
-        </div>
-      )}
-      {c.disks && c.disks.some((d) => entities[d.entityId]) && (
-        <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-2.5">
-          {c.disks
-            .filter((d) => entities[d.entityId])
-            .map((d) => {
-              const v = meterValue(d, entities);
-              return (
-                <HBar
-                  key={d.entityId}
-                  label={
-                    <span className="flex items-center gap-1.5">
-                      <HardDrive size={11} className="text-dx-dim" />
-                      {d.label}
-                    </span>
-                  }
-                  value={v ?? 0}
-                  max={100}
-                  display={v === null ? "—" : `${Math.round(v)}%`}
-                  color={v !== null && v >= 90 ? C.red : v !== null && v >= 80 ? C.amber : C.cyan}
-                />
-              );
-            })}
-        </div>
-      )}
-      {c.actions && c.actions.length > 0 && (
-        <div className="mt-4 flex gap-1.5">
-          {c.actions
-            .filter((a) => (a.when === "online") === online)
-            .map((a) => {
-              const Icon = a.icon ?? (a.when === "offline" ? Power : Moon);
-              const confirming = armed === a.label;
-              return (
-                <Btn
-                  key={a.label}
-                  color={confirming ? C.amber : a.when === "offline" ? C.green : undefined}
-                  onClick={() => {
-                    if (a.confirm && !confirming) return setArmed(a.label);
-                    setArmed(null);
-                    callService(a.domain, a.service, {}, { entity_id: a.entityId }).catch(() => {});
-                  }}
-                >
-                  <Icon size={12} /> {confirming ? `Confirm ${a.label.toLowerCase()}` : a.label}
-                </Btn>
-              );
-            })}
-        </div>
-      )}
     </Panel>
   );
 }

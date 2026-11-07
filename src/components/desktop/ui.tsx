@@ -182,12 +182,18 @@ export function Ring({
   sub,
   color = C.cyan,
   size = 86,
+  text,
+  unit = "%",
 }: {
+  /** How full the ring is, 0–100. */
   value: number | null;
   label: string;
   sub?: string;
   color?: string;
   size?: number;
+  /** Center text when it isn't the percentage (e.g. "141" for a temperature). */
+  text?: string;
+  unit?: string;
 }) {
   const r = 40;
   const circ = 2 * Math.PI * r;
@@ -222,8 +228,8 @@ export function Ring({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="dx-num text-[19px] font-medium text-dx-text">{value === null ? "—" : Math.round(v)}</span>
-          <span className="text-[9px] text-dx-dim">%</span>
+          <span className="dx-num text-[19px] font-medium text-dx-text">{value === null ? "—" : (text ?? Math.round(v))}</span>
+          <span className="text-[9px] text-dx-dim">{unit}</span>
         </div>
       </div>
       <div className="text-center leading-tight">

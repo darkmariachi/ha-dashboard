@@ -310,3 +310,63 @@ export function Spark({ values, color, height = 34 }: { values: number[] | null;
     </svg>
   );
 }
+
+/** Stacked vertical bars: each bar is the sum of its parts, drawn bottom-up
+ * in `colors` order; hover shows the parts. */
+export function StackedBars({
+  bars,
+  colors,
+  names,
+  height = 120,
+  format = (v) => v.toFixed(0),
+}: {
+  bars: { label: string; parts: number[] }[];
+  colors: string[];
+  names: string[];
+  height?: number;
+  format?: (v: number) => string;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(1, ...bars.map((b) => b.parts.reduce((a, c) => a + c, 0)));
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="relative flex items-end gap-1.5" style={{ height }}>
+        {bars.map((b, i) => {
+          const total = b.parts.reduce((a, c) => a + c, 0);
+          return (
+            <div key={i} className="relative flex h-full flex-1 flex-col justify-end" onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
+              {hover === i && (
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded border border-white/10 bg-[#0b0d16] px-2 py-1 text-[10.5px]">
+                  <div className="dx-num text-dx-text">{format(total)}</div>
+                  {b.parts.map((p, j) => (
+                    <div key={j} className="flex items-center gap-1.5 text-dx-dim">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: colors[j] }} />
+                      {names[j]} <span className="dx-num ml-auto pl-2 text-dx-text">{format(p)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <span className="dx-num mb-0.5 text-center text-[9.5px] text-dx-faint">{total > 0 ? format(total) : ""}</span>
+              <div className="flex w-full flex-col-reverse overflow-hidden rounded-t-[2px]" style={{ opacity: hover === null || hover === i ? 1 : 0.55 }}>
+                {b.parts.map((p, j) => (
+                  <div
+                    key={j}
+                    className="w-full transition-[height] duration-700"
+                    style={{ height: (p / max) * (height - 18), background: colors[j], boxShadow: `0 0 10px -3px ${colors[j]}` }}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1.5">
+        {bars.map((b, i) => (
+          <span key={i} className="dx-num flex-1 truncate text-center text-[9.5px] text-dx-faint">
+            {b.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}

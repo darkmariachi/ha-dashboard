@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { CURATED_COMPUTERS } from "../../config/computers";
 import { CURATED_CLIMATE_ENTITY, CURATED_ENERGY, CURATED_VACUUM, CURATED_WEATHER_ENTITY } from "../../config/curatedHome";
-import { DESKTOP_ALARM, DESKTOP_APPLIANCES, DESKTOP_INDOOR, DESKTOP_NETWORK, DESKTOP_SAFETY } from "../../config/desktop";
+import { DESKTOP_ALARM, DESKTOP_APPLIANCES, DESKTOP_INDOOR, DESKTOP_NETWORK, DESKTOP_SAFETY, DESKTOP_SERVER } from "../../config/desktop";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
 import { useCameraEvents, typeInfo } from "../home/ActivityFeed";
@@ -77,7 +77,7 @@ function Kpi({
 }
 
 export function KpiRow({ go }: { go: (page: string) => void }) {
-  const { entities } = useHa();
+  const { entities, entitiesWithArea } = useHa();
   const usageH = useEntityHistory(CURATED_ENERGY.consumption, 6, 48);
   const solarH = useEntityHistory(CURATED_ENERGY.production, 6, 48);
   const indoorH = useEntityHistory(DESKTOP_INDOOR.temperature, 24, 48);
@@ -95,8 +95,12 @@ export function KpiRow({ go }: { go: (page: string) => void }) {
   const inside = num(entities[DESKTOP_INDOOR.temperature]) ?? (climate?.attributes.current_temperature as number | undefined) ?? null;
   const rh = num(entities[DESKTOP_INDOOR.humidity]);
   const wanDown = entities[DESKTOP_NETWORK.wan]?.state === "off";
+  // The UPnP throughput sensors can go unavailable; fall back to skylab's LAN port.
+  const wanKnown = isLive(entities[DESKTOP_NETWORK.down]);
+  const lanH = useEntityHistory(DESKTOP_SERVER.nic.rx, 6, 48);
   const leftOn = away && indoor.length > 0;
   const usageParts = usage === null ? null : fmtW(usage).split(" ");
+  const clients = Object.values(entitiesWithArea).filter((e) => e.domain === "device_tracker" && e.platform === "unifi" && e.entity.state === "home").length;
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
@@ -127,19 +131,34 @@ export function KpiRow({ go }: { go: (page: string) => void }) {
       >
         <Spark values={indoorH} color={C.violet} />
       </Kpi>
-      <Kpi
-        label="Internet"
-        icon={wanDown ? Globe : Wifi}
-        color={C.cyan}
-        alert={wanDown}
-        value={wanDown ? "DOWN" : fmtMbps(mbps(num(entities[DESKTOP_NETWORK.down])))}
-        unit={wanDown ? undefined : "Mb/s"}
-        sub={`↑ ${fmtMbps(mbps(num(entities[DESKTOP_NETWORK.up])))} Mb/s`}
-        delay={120}
-        onClick={() => go("devices")}
-      >
-        <Spark values={downH?.map((v) => mbps(v)!) ?? null} color={C.cyan} />
-      </Kpi>
+      {wanKnown ? (
+        <Kpi
+          label="Internet"
+          icon={wanDown ? Globe : Wifi}
+          color={C.cyan}
+          alert={wanDown}
+          value={wanDown ? "DOWN" : fmtMbps(mbps(num(entities[DESKTOP_NETWORK.down])))}
+          unit={wanDown ? undefined : "Mb/s"}
+          sub={`↑ ${fmtMbps(mbps(num(entities[DESKTOP_NETWORK.up])))} Mb/s`}
+          delay={120}
+          onClick={() => go("devices")}
+        >
+          <Spark values={downH?.map((v) => mbps(v)!) ?? null} color={C.cyan} />
+        </Kpi>
+      ) : (
+        <Kpi
+          label="LAN · skylab"
+          icon={Wifi}
+          color={C.green}
+          value={num(entities[DESKTOP_SERVER.nic.rx])?.toFixed(1) ?? "—"}
+          unit="Mb/s"
+          sub={`↑ ${num(entities[DESKTOP_SERVER.nic.tx])?.toFixed(1) ?? "—"} · ${clients} clients`}
+          delay={120}
+          onClick={() => go("devices")}
+        >
+          <Spark values={lanH} color={C.green} />
+        </Kpi>
+      )}
       <Kpi
         label="Powered on"
         icon={Power}
@@ -571,60 +590,6 @@ export function HealthPanel({ delay = 0, className }: { delay?: number; classNam
         dot={low.length ? C.amber : C.green}
         v={low.length ? `${low.length} LOW` : "OK"}
         color={low.length ? C.amber : undefined}
-      />
-    </Panel>
-  );
-}
-
-/* -------------------------------------------------------------- Network */
-
-export function NetworkPanel({ hours = 6, delay = 0, className, height = 110 }: { hours?: number; delay?: number; className?: string; height?: number }) {
-  const { entities, entitiesWithArea } = useHa();
-  const downH = useEntityHistory(DESKTOP_NETWORK.down, hours, 72);
-  const upH = useEntityHistory(DESKTOP_NETWORK.up, hours, 72);
-  const wan = entities[DESKTOP_NETWORK.wan];
-  const clients = Object.values(entitiesWithArea).filter((e) => e.domain === "device_tracker" && e.platform === "unifi" && e.entity.state === "home");
-  const wired = clients.filter((c) => c.entity.attributes.is_wired).length;
-  const offline = wan?.state === "off";
-
-  return (
-    <Panel
-      title="Network"
-      icon={Globe}
-      accent={C.cyan}
-      delay={delay}
-      className={className}
-      right={
-        wan && (
-          <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: offline ? C.red : C.green }}>
-            <Dot color={offline ? C.red : C.green} pulse={!offline} /> {offline ? "WAN down" : "WAN up"}
-          </span>
-        )
-      }
-    >
-      <div className="mb-3 grid grid-cols-3 gap-4">
-        <div>
-          <Label>↓ Down</Label>
-          <Big value={fmtMbps(mbps(num(entities[DESKTOP_NETWORK.down])))} unit="Mb/s" color={C.cyan} size={24} />
-        </div>
-        <div>
-          <Label>↑ Up</Label>
-          <Big value={fmtMbps(mbps(num(entities[DESKTOP_NETWORK.up])))} unit="Mb/s" color={C.pink} size={24} />
-        </div>
-        <div>
-          <Label>Clients</Label>
-          <Big value={clients.length} unit={`${wired} wired`} size={24} />
-        </div>
-      </div>
-      <LineChart
-        hours={hours}
-        height={height}
-        floor={0}
-        format={(v) => `${fmtMbps(v)}`}
-        series={[
-          ...(downH ? [{ label: "Down", values: downH.map((v) => mbps(v)!), color: C.cyan, fill: true }] : []),
-          ...(upH ? [{ label: "Up", values: upH.map((v) => mbps(v)!), color: C.pink }] : []),
-        ]}
       />
     </Panel>
   );

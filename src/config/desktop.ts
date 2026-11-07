@@ -39,7 +39,8 @@ export const DESKTOP_APPLIANCES: { entityId: string; label: string; kind: "temp"
   { entityId: "sensor.range_temperature_measurement", label: "Oven", kind: "temp" },
 ];
 
-/** Internet, from the UDM's UPnP integration (rates in KiB/s). */
+/** Internet, from the UDM's UPnP integration (rates in KiB/s). When those
+ * go unavailable, the Network panel falls back to skylab's own LAN port. */
 export const DESKTOP_NETWORK = {
   wan: "binary_sensor.unifi_dream_machine_wan_status_2",
   down: "sensor.unifi_dream_machine_kib_s_received_2",
@@ -49,3 +50,44 @@ export const DESKTOP_NETWORK = {
 
 /** Battery-powered things at or below this % are listed as low. */
 export const LOW_BATTERY_PCT = 20;
+
+/** skylab's Glances sensors, for the server panel on the Devices page. */
+export const DESKTOP_SERVER = {
+  cpu: "sensor.skylab_cpu_usage",
+  load: "sensor.skylab_cpu_load",
+  memory: "sensor.skylab_memory_usage",
+  memoryUsed: "sensor.skylab_memory_use",
+  swap: "sensor.skylab_swap_usage",
+  gpu: "sensor.skylab_intel_gpu_gpu_intel0_processor_usage",
+  containers: "sensor.skylab_containers_active",
+  containersCpu: "sensor.skylab_containers_cpu_usage",
+  containersMemory: "sensor.skylab_containers_memory_used",
+  processes: "sensor.skylab_total",
+  threads: "sensor.skylab_threads",
+  temps: [
+    { entityId: "sensor.skylab_package_id_0_temperature", label: "Package" },
+    { entityId: "sensor.skylab_core_0_temperature", label: "Core 0" },
+    { entityId: "sensor.skylab_core_1_temperature", label: "Core 1" },
+    { entityId: "sensor.skylab_core_2_temperature", label: "Core 2" },
+    { entityId: "sensor.skylab_core_3_temperature", label: "Core 3" },
+    { entityId: "sensor.skylab_composite_temperature", label: "NVMe" },
+    { entityId: "sensor.skylab_intel_gpu_gpu_intel0_temperature", label: "GPU" },
+  ],
+  /** The LAN port (Mbit/s). */
+  nic: { rx: "sensor.skylab_enp5s0_rx", tx: "sensor.skylab_enp5s0_tx" },
+  /** Block devices for disk I/O (MB/s). */
+  io: [
+    { label: "NVMe", dev: "nvme0n1" },
+    { label: "sda", dev: "sda" },
+    { label: "sdb", dev: "sdb" },
+    { label: "sdc", dev: "sdc" },
+  ],
+  /** Mounts: sensor.skylab_<key>_disk_{usage,used,size,free}. */
+  mounts: [
+    { key: "etc_hostname", label: "System" },
+    { key: "mnt_drive1", label: "Drive 1" },
+    { key: "mnt_drive2", label: "Drive 2" },
+    { key: "mnt_drive3", label: "Drive 3" },
+    { key: "mnt_pool", label: "Media pool" },
+  ],
+};

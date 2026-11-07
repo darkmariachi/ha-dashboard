@@ -23,13 +23,12 @@ import { CURATED_COMPUTERS } from "../../config/computers";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
 import { GamingCard } from "../devices/GamingCard";
-import { NotificationsCard } from "../devices/NotificationsCard";
-import { YouTubeCard } from "../devices/YouTubeCard";
 import { QuickActionToast } from "../home/QuickActionToast";
 import { SpotifySearchModal } from "../home/SpotifySearchModal";
 import { weatherIcon } from "../home/statusIcons";
-import { VisitorsPanel } from "../visitors/VisitorsPanel";
-import { ComputerPanel, DetectionsPanel, EnergyBreakdown, IndoorPanel, LightsPanel, PresencePanel } from "./analysis";
+import { DetectionsPanel, EnergyBreakdown, IndoorPanel, LightsPanel, PresencePanel } from "./analysis";
+import { DevicesSummary, FleetTable, NetworkConsole, NotifyPanel, ScreenTimePanel, ServerPanel, WorkstationPanel } from "./devices";
+import { VisitorsConsole } from "./visitors";
 import { ClimatePanel, OnNowPanel, RoomPanel, RoomsMatrix, SprinklerPanel, TvPanel, VacuumPanel } from "./control";
 import { useIssues, useOpenings } from "./data";
 import {
@@ -37,7 +36,6 @@ import {
   EventStream,
   HealthPanel,
   KpiRow,
-  NetworkPanel,
   OpeningsTimeline,
   PowerPanel,
   SystemsPanel,
@@ -163,15 +161,22 @@ function Energy() {
 function Devices() {
   return (
     <>
-      <div className="grid gap-3 xl:grid-cols-2">
-        {CURATED_COMPUTERS.map((c, i) => (
-          <ComputerPanel key={c.key} computer={c} index={i} />
+      <DevicesSummary />
+      <FleetTable delay={60} />
+      <ServerPanel delay={100} />
+      <div className="grid gap-3 xl:grid-cols-3">
+        {CURATED_COMPUTERS.filter((c) => c.key !== "skylab").map((c, i) => (
+          <WorkstationPanel key={c.key} c={c} index={i} />
         ))}
       </div>
-      <NetworkPanel hours={24} height={160} delay={160} />
-      <div className="grid items-start gap-3 xl:grid-cols-2">
-        <YouTubeCard index={CURATED_COMPUTERS.length} />
-        <NotificationsCard index={CURATED_COMPUTERS.length + 1} />
+      <NetworkConsole delay={180} />
+      <div className="grid items-start gap-3 xl:grid-cols-12">
+        <div className="xl:col-span-8">
+          <ScreenTimePanel delay={220} />
+        </div>
+        <div className="xl:col-span-4">
+          <NotifyPanel delay={260} />
+        </div>
       </div>
     </>
   );
@@ -194,11 +199,7 @@ function Insights() {
 }
 
 function Visitors() {
-  return (
-    <div className="max-w-4xl">
-      <VisitorsPanel />
-    </div>
-  );
+  return <VisitorsConsole />;
 }
 
 /* --------------------------------------------------------------- Shell */
