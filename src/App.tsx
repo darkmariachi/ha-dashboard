@@ -17,6 +17,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import { TvScreen } from "./components/tv/TvScreen";
 import { CaseScreen } from "./components/case/CaseScreen";
 import { WallScreen } from "./components/wall/WallScreen";
+import { DesktopScreen } from "./components/desktop/DesktopScreen";
 
 /** Shown while a saved login reconnects on launch. Same navy as the PWA's
  * manifest background, so Android's launch splash fades straight into it. */
@@ -41,6 +42,7 @@ function App() {
   const isPair = pathname.startsWith("/pair");
   const isCase = pathname.startsWith("/case");
   const isWall = pathname.startsWith("/wall");
+  const isDesktop = pathname.startsWith("/desktop");
   // Once we've been connected, a drop (phone screen off, Wi-Fi to mobile
   // handoff, HA restart) shouldn't throw everyone back to the login form —
   // the library reconnects on its own, so keep the UI up with a banner.
@@ -85,8 +87,8 @@ function App() {
 
       {/* The phone and TV layouts have their own tabs instead of the drawer;
           the case screen is display-only, and the wall kiosk has no way back
-          from another page. */}
-      {!isPhone && !isTv && !isPair && !isCase && !isWall && (
+          from another page. The desktop layout has its own nav rail. */}
+      {!isPhone && !isTv && !isPair && !isCase && !isWall && !isDesktop && (
         <>
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -108,6 +110,7 @@ function App() {
           <Route path="/tv/*" element={<TvScreen />} />
           <Route path="/case" element={<CaseScreen />} />
           <Route path="/wall" element={<WallScreen />} />
+          <Route path="/desktop/*" element={<DesktopScreen />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/area/:areaSlug" element={<AreaPage />} />
@@ -118,8 +121,9 @@ function App() {
 
       {/* The loud door alarm is for the wall tablet; a phone away from home
           (or the TV mid-movie) shouldn't start blaring. The Doors tile still
-          shows what's open. */}
-      {!isPhone && !isTv && !isPair && !isCase && <DoorAlertMonitor />}
+          shows what's open. Same for a desktop computer: its Doors tile glows
+          and the nav rail badges the Security page instead. */}
+      {!isPhone && !isTv && !isPair && !isCase && !isDesktop && <DoorAlertMonitor />}
     </div>
   );
 }

@@ -24,9 +24,13 @@ function modeMeta(mode: string) {
 export function ClimateControlModal({
   entityId,
   onClose,
+  inline,
 }: {
   entityId: string;
   onClose: () => void;
+  /** An always-open glass panel in the page flow (desktop) instead of a
+   * pop-up; onClose is unused then. */
+  inline?: boolean;
 }) {
   const { entities, callService } = useHa();
   const entity = entities[entityId];
@@ -122,29 +126,33 @@ export function ClimateControlModal({
     return "var(--color-text-dim)";
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-tv-scope>
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden />
-
+  const panel = (
       <div
-        className="relative flex w-full max-w-sm flex-col gap-5 rounded-2xl border border-border bg-surface p-5 shadow-xl"
+        className={clsx(
+          "relative flex w-full flex-col gap-5 p-5",
+          inline ? "glass rise rounded-[26px]" : "max-w-sm rounded-2xl border border-border bg-surface shadow-xl",
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-sm font-semibold text-text">{entity.attributes.friendly_name ?? entityId}</div>
-            <div className="text-xs text-text-dim">
+            <div className={clsx("font-semibold text-text", inline ? "text-lg" : "text-sm")}>
+              {entity.attributes.friendly_name ?? entityId}
+            </div>
+            <div className={clsx("text-text-dim", inline ? "text-[13px]" : "text-xs")}>
               {current !== undefined ? `Currently ${current}°` : "—"}
               {hvacAction && !off ? ` · ${hvacAction}` : ""}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-text-dim hover:bg-chip hover:text-text"
-          >
-            <X size={16} />
-          </button>
+          {!inline && (
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-dim hover:bg-chip hover:text-text"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* Target temperature */}
@@ -262,6 +270,14 @@ export function ClimateControlModal({
           </div>
         )}
       </div>
+  );
+
+  if (inline) return panel;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" data-tv-scope>
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden />
+      {panel}
     </div>
   );
 }

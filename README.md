@@ -126,6 +126,19 @@ know whether it's mattering to you day to day, and how your cameras are
 backed (e.g. go2rtc in front of UniFi Protect/RTSP sources works well for
 a WebRTC or HLS embed).
 
+## On a desktop computer
+
+`/desktop` is a denser layout for a monitor, mouse and keyboard. It has a
+permanent nav rail with quick actions and music, and keys **1–7** jump
+between pages. The Overview page has a KPI strip (power, energy today,
+indoor, doors & windows, on now, internet, alarm, house health), the rooms,
+the cameras, plus house health, network and computer panels. The tablet's
+pop-up sheets (Power, Doors, On right now, the thermostat) are laid out as
+panels on the Rooms, Security and Energy pages. Charts there show a readout
+when you hover over them. Entities that only this layout uses (windows,
+smoke/CO, appliances, internet throughput, indoor sensors) are listed in
+`src/config/desktop.ts`.
+
 ## On the TV
 
 `/tv` is a layout for a 10-foot screen, driven entirely with a remote's

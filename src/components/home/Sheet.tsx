@@ -1,6 +1,18 @@
 import { X } from "lucide-react";
-import { useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { createPortal } from "react-dom";
+
+const InlineSheetContext = createContext(false);
+
+/**
+ * Renders the one Sheet directly inside it as an always-open glass panel in
+ * the page flow instead of a pop-up — the desktop layout uses this to show
+ * the tablet's detail sheets (Power, Doors, On right now) side by side.
+ * Sheets opened from inside that panel are pop-ups again.
+ */
+export function InlineSheet({ children }: { children: React.ReactNode }) {
+  return <InlineSheetContext.Provider value={true}>{children}</InlineSheetContext.Provider>;
+}
 
 /**
  * Detail pop-up for a status tile: a bottom sheet on phones, a centered
@@ -22,13 +34,30 @@ export function Sheet({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const inline = useContext(InlineSheetContext);
+
   useEffect(() => {
+    if (inline) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, inline]);
+
+  if (inline) {
+    return (
+      <section aria-label={title} className="glass rise flex min-h-0 flex-col overflow-hidden rounded-[26px]">
+        <div className="px-5 pb-3 pt-5">
+          <div className="text-lg font-semibold text-text">{title}</div>
+          {subtitle && <div className="text-[13px] text-text-dim">{subtitle}</div>}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-5">
+          <InlineSheetContext.Provider value={false}>{children}</InlineSheetContext.Provider>
+        </div>
+      </section>
+    );
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" data-tv-scope>
