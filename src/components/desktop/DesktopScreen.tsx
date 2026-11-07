@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
+import "@fontsource-variable/space-grotesk";
+import "@fontsource-variable/jetbrains-mono";
 import {
   Cctv,
   ChartColumn,
@@ -9,239 +11,165 @@ import {
   LayoutGrid,
   ListTree,
   LogOut,
+  Music,
   Settings,
-  Smartphone,
+  Tablet,
   Users,
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import {
-  CURATED_CAMERAS,
-  CURATED_CLIMATE_ENTITY,
-  CURATED_QUICK_ACTIONS,
-  CURATED_ROOMS,
-  CURATED_TVS,
-  CURATED_WEATHER_ENTITY,
-  type QuickAction,
-} from "../../config/curatedHome";
+import { CURATED_CAMERAS, CURATED_QUICK_ACTIONS, CURATED_ROOMS, CURATED_WEATHER_ENTITY, HOUSEHOLD_PEOPLE, type QuickAction } from "../../config/curatedHome";
 import { CURATED_COMPUTERS } from "../../config/computers";
 import { useHa } from "../../ha/HaProvider";
-import { resolveCuratedCamera } from "../../lib/entityHelpers";
-import { roomColorFor } from "../../lib/roomPalette";
-import { isNightFor } from "../../lib/weatherTheme";
-import { CameraCard } from "../cards/CameraCard";
-import { ClimateControlModal } from "../climate/ClimateControlModal";
-import { ComputerCard } from "../devices/ComputerCard";
+import { useNow } from "../../lib/useNow";
 import { GamingCard } from "../devices/GamingCard";
 import { NotificationsCard } from "../devices/NotificationsCard";
 import { YouTubeCard } from "../devices/YouTubeCard";
-import { ActivityFeed } from "../home/ActivityFeed";
-import { DoorsModal } from "../home/DoorsModal";
-import { OnNowModal } from "../home/OnNowModal";
-import { PowerModal } from "../home/PowerModal";
 import { QuickActionToast } from "../home/QuickActionToast";
-import { RoomCard } from "../home/RoomCard";
-import { InlineSheet } from "../home/Sheet";
 import { SpotifySearchModal } from "../home/SpotifySearchModal";
-import { SprinklersCard } from "../home/SprinklersCard";
-import { TvCard } from "../home/TvCard";
-import { VacuumCard } from "../home/VacuumCard";
-import { WeatherBackground } from "../home/WeatherBackground";
-import { LightsInsightCard } from "../insights/LightsInsightCard";
-import { PresenceInsightCard } from "../insights/PresenceInsightCard";
+import { weatherIcon } from "../home/statusIcons";
 import { VisitorsPanel } from "../visitors/VisitorsPanel";
-import { DesktopHeader } from "./DesktopHeader";
+import { ComputerPanel, DetectionsPanel, EnergyBreakdown, IndoorPanel, LightsPanel, PresencePanel } from "./analysis";
+import { ClimatePanel, OnNowPanel, RoomPanel, RoomsMatrix, SprinklerPanel, TvPanel, VacuumPanel } from "./control";
+import { useIssues, useOpenings } from "./data";
 import {
+  CameraTile,
+  EventStream,
   HealthPanel,
-  IndoorPanel,
-  KpiStrip,
+  KpiRow,
   NetworkPanel,
-  OpeningsPanel,
+  OpeningsTimeline,
+  PowerPanel,
   SystemsPanel,
-  useHealthIssues,
-  useOpenings,
-  WeekPowerPanel,
-} from "./panels";
-
-/** Camera stills refresh this often; click one for the live stream. */
-const CAMERA_SNAPSHOT_MS = 4_000;
-
-const ACTION_ACCENTS: Record<string, string> = {
-  leaving: roomColorFor(4).accent,
-  party: roomColorFor(5).accent,
-  good_night: roomColorFor(3).accent,
-};
+  WeatherPanel,
+} from "./monitor";
+import { Btn, C, Dot, Label } from "./ui";
 
 interface Page {
+  key: string;
   to: string;
   label: string;
   icon: LucideIcon;
-  end?: boolean;
 }
 
 const PAGES: Page[] = [
-  { to: "/desktop", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/desktop/rooms", label: "Rooms", icon: LayoutGrid },
-  { to: "/desktop/security", label: "Security", icon: Cctv },
-  { to: "/desktop/energy", label: "Energy & climate", icon: Zap },
-  { to: "/desktop/devices", label: "Devices & network", icon: Cpu },
-  { to: "/desktop/insights", label: "Insights", icon: ChartColumn },
-  { to: "/desktop/visitors", label: "Visitors", icon: Users },
+  { key: "overview", to: "/desktop", label: "Overview", icon: LayoutDashboard },
+  { key: "rooms", to: "/desktop/rooms", label: "Rooms", icon: LayoutGrid },
+  { key: "security", to: "/desktop/security", label: "Security", icon: Cctv },
+  { key: "energy", to: "/desktop/energy", label: "Energy", icon: Zap },
+  { key: "devices", to: "/desktop/devices", label: "Devices", icon: Cpu },
+  { key: "insights", to: "/desktop/insights", label: "Insights", icon: ChartColumn },
+  { key: "visitors", to: "/desktop/visitors", label: "Visitors", icon: Users },
 ];
 
-function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+const ACTION_COLORS: Record<string, string> = { leaving: C.amber, party: C.pink, good_night: C.violet };
+
+/** A panel that fills its grid cell instead of sizing it (so a long list
+ * scrolls inside rather than stretching the row). */
+function Fill({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="rise hero-shadow text-white">
-      <h1 className="text-[34px] font-semibold tracking-[-0.6px]">{title}</h1>
-      {subtitle && <p className="text-[14px] opacity-85">{subtitle}</p>}
+    <div className={clsx("relative min-h-[320px]", className)}>
+      <div className="absolute inset-0 flex [&>section]:flex-1">{children}</div>
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="hero-shadow mx-1 -mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/85">{children}</h2>
-  );
-}
+/* --------------------------------------------------------------- Pages */
 
-/** A refreshing camera still (bare cards carry their own name); click it for
- * the live stream. */
-function LabeledCamera({ entityId, label }: { entityId: string; label: string }) {
-  const { entitiesWithArea } = useHa();
-  return (
-    <CameraCard ent={resolveCuratedCamera(entitiesWithArea, { entityId, label })} bare snapshotEveryMs={CAMERA_SNAPSHOT_MS} />
-  );
-}
-
-function OverviewPage() {
-  const cameras = CURATED_CAMERAS.filter((c) => c.sidebar);
+function Overview({ go }: { go: (k: string) => void }) {
+  const cams = CURATED_CAMERAS.filter((c) => c.sidebar);
   return (
     <>
-      <DesktopHeader />
-      <KpiStrip />
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="grid content-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {CURATED_ROOMS.map((room, i) => (
-            <RoomCard key={room.key} room={room} index={i} />
+      <KpiRow go={go} />
+      <div className="grid gap-3 xl:grid-cols-12">
+        <PowerPanel className="xl:col-span-7" height={196} delay={80} />
+        <WeatherPanel className="xl:col-span-5" delay={120} />
+      </div>
+      <div className="grid gap-3 xl:grid-cols-12">
+        <RoomsMatrix className="xl:col-span-5" delay={160} />
+        <div className="dx-in grid grid-cols-2 content-start gap-2 xl:col-span-4" style={{ animationDelay: "200ms" }}>
+          {cams.map((c, i) => (
+            <CameraTile key={c.entityId} entityId={c.entityId} label={c.label} className={i === 0 ? "col-span-2 aspect-video" : "aspect-video"} />
           ))}
         </div>
-        <div className="rise flex flex-col gap-3" style={{ animationDelay: "350ms" }}>
-          {cameras.map((c) => (
-            <LabeledCamera key={c.entityId} entityId={c.entityId} label={c.label} />
-          ))}
-        </div>
+        <Fill className="xl:col-span-3">
+          <EventStream delay={240} />
+        </Fill>
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-        <HealthPanel delay={400} />
-        <NetworkPanel delay={450} />
-        <SystemsPanel delay={500} />
-      </div>
-
-      <SectionLabel>Recent camera activity</SectionLabel>
-      <ActivityFeed compact />
-    </>
-  );
-}
-
-function RoomsPage() {
-  return (
-    <>
-      <PageTitle title="Rooms" subtitle="Every room's switches and Hue lights, the TVs, the vacuum and the sprinklers." />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(340px,1fr)]">
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            {CURATED_ROOMS.map((room, i) => (
-              <RoomCard key={room.key} room={room} index={i} />
-            ))}
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {CURATED_TVS.length > 0 && <TvCard index={CURATED_ROOMS.length} />}
-            <SprinklersCard index={CURATED_ROOMS.length + 1} />
-          </div>
-          <VacuumCard index={CURATED_ROOMS.length + 2} wide />
-        </div>
-        <div className="xl:sticky xl:top-0 xl:max-h-[calc(100vh-4rem)] xl:self-start [&>section]:max-h-[calc(100vh-4rem)]">
-          <InlineSheet>
-            <OnNowModal onClose={() => {}} />
-          </InlineSheet>
-        </div>
+      <div className="grid gap-3 xl:grid-cols-12">
+        <OpeningsTimeline className="xl:col-span-5" delay={280} />
+        <SystemsPanel className="xl:col-span-4" delay={300} />
+        <HealthPanel className="xl:col-span-3" delay={320} />
       </div>
     </>
   );
 }
 
-function SecurityPage() {
-  const { open } = useOpenings();
-  const { issues } = useHealthIssues();
-  const danger = issues.filter((i) => i.severity === "danger");
+function Rooms() {
   return (
     <>
-      <PageTitle
-        title="Security"
-        subtitle={
-          danger.length
-            ? danger.map((d) => `${d.label}: ${d.detail}`).join(" · ")
-            : open.length
-              ? `${open.length} open: ${open.map((o) => o.label).join(", ")}`
-              : "Everything's closed and quiet."
-        }
-      />
-      <div className="rise grid gap-3 md:grid-cols-2 2xl:grid-cols-3" style={{ animationDelay: "80ms" }}>
+      <div className="grid gap-3 xl:grid-cols-12">
+        <div className="grid content-start gap-3 md:grid-cols-2 xl:col-span-9 2xl:grid-cols-4">
+          {CURATED_ROOMS.map((r, i) => (
+            <RoomPanel key={r.key} room={r} index={i} />
+          ))}
+        </div>
+        <Fill className="min-h-[520px] xl:col-span-3">
+          <OnNowPanel delay={120} />
+        </Fill>
+      </div>
+      <div className="grid items-start gap-3 xl:grid-cols-3">
+        <TvPanel delay={200} />
+        <VacuumPanel delay={240} />
+        <SprinklerPanel delay={280} />
+      </div>
+    </>
+  );
+}
+
+function Security() {
+  return (
+    <>
+      <div className="dx-in grid grid-cols-2 gap-2 xl:grid-cols-3">
         {CURATED_CAMERAS.map((c) => (
-          <LabeledCamera key={c.entityId} entityId={c.entityId} label={c.label} />
+          <CameraTile key={c.entityId} entityId={c.entityId} label={c.label} />
         ))}
       </div>
-      <p className="hero-shadow -mt-2 text-center text-xs text-white/75">
-        Stills refresh every {CAMERA_SNAPSHOT_MS / 1000}s · click a camera for live video
-      </p>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="flex flex-col gap-4">
-          <InlineSheet>
-            <DoorsModal onClose={() => {}} />
-          </InlineSheet>
-        </div>
-        <div className="flex flex-col gap-4">
-          <OpeningsPanel delay={150} />
-        </div>
-        <div className="rise" style={{ animationDelay: "200ms" }}>
-          <ActivityFeed limit={60} />
-        </div>
+      <div className="grid gap-3 xl:grid-cols-12">
+        <OpeningsTimeline className="xl:col-span-5" delay={100} />
+        <Fill className="xl:col-span-4">
+          <EventStream delay={140} hours={48} />
+        </Fill>
+        <HealthPanel className="xl:col-span-3" delay={180} />
+      </div>
+      <DetectionsPanel delay={220} />
+    </>
+  );
+}
+
+function Energy() {
+  return (
+    <>
+      <PowerPanel height={240} />
+      <EnergyBreakdown delay={80} />
+      <div className="grid gap-3 xl:grid-cols-12">
+        <ClimatePanel className="xl:col-span-5" delay={160} />
+        <IndoorPanel className="xl:col-span-7" delay={200} />
       </div>
     </>
   );
 }
 
-function EnergyPage() {
+function Devices() {
   return (
     <>
-      <PageTitle title="Energy & climate" subtitle="Live usage, solar, appliances, the thermostat and indoor trends." />
-      <WeekPowerPanel delay={60} />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <InlineSheet>
-          <PowerModal onClose={() => {}} />
-        </InlineSheet>
-        <div className="flex flex-col gap-4">
-          <ClimateControlModal entityId={CURATED_CLIMATE_ENTITY} onClose={() => {}} inline />
-          <IndoorPanel delay={150} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-function DevicesPage() {
-  return (
-    <>
-      <PageTitle title="Devices & network" subtitle="Computers, the home server, the internet connection and screen time." />
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         {CURATED_COMPUTERS.map((c, i) => (
-          <ComputerCard key={c.key} computer={c} index={i} />
+          <ComputerPanel key={c.key} computer={c} index={i} />
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <NetworkPanel delay={200} hours={24} />
+      <NetworkPanel hours={24} height={160} delay={160} />
+      <div className="grid items-start gap-3 xl:grid-cols-2">
         <YouTubeCard index={CURATED_COMPUTERS.length} />
         <NotificationsCard index={CURATED_COMPUTERS.length + 1} />
       </div>
@@ -249,121 +177,157 @@ function DevicesPage() {
   );
 }
 
-function InsightsPage() {
+function Insights() {
   return (
     <>
-      <PageTitle title="Insights" subtitle="Patterns from Home Assistant's history: who's home when, lights, console time." />
-      <div className="grid items-start gap-4 xl:grid-cols-3">
-        <PresenceInsightCard />
-        <LightsInsightCard index={1} />
-        <GamingCard index={2} />
-      </div>
-    </>
-  );
-}
-
-function VisitorsPage() {
-  return (
-    <>
-      <PageTitle title="Visitors" subtitle="Devices that joined the Wi-Fi and aren't the household's." />
-      <div className="max-w-3xl">
-        <VisitorsPanel />
-      </div>
-    </>
-  );
-}
-
-/** Left navigation rail: pages, quick actions, music and links out. */
-function NavRail({ onRunAction, onMusic }: { onRunAction: (a: QuickAction) => void; onMusic: () => void }) {
-  const { status, logout } = useHa();
-  const { open } = useOpenings();
-  const { issues } = useHealthIssues();
-  const badges: Record<string, number> = {
-    "/desktop/security": open.length + issues.filter((i) => i.severity === "danger").length,
-  };
-
-  return (
-    <nav className="glass flex h-full w-[232px] shrink-0 flex-col gap-1 overflow-y-auto rounded-none border-y-0 border-l-0 px-3 py-5">
-      <div className="mb-4 flex items-center gap-2.5 px-2">
-        <img src="/icon.svg" alt="" className="h-8 w-8 rounded-[10px]" />
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-text">Home</div>
-          <div className="flex items-center gap-1.5 text-[11px] text-text-dim">
-            <span
-              className={clsx("h-1.5 w-1.5 rounded-full", status === "connected" ? "bg-[#3ee08f]" : "bg-warn")}
-            />
-            {status === "connected" ? "Live" : status}
-          </div>
+      <div className="grid items-start gap-3 xl:grid-cols-12">
+        <div className="xl:col-span-7">
+          <PresencePanel />
+        </div>
+        <div className="xl:col-span-5">
+          <LightsPanel delay={60} />
         </div>
       </div>
+      <GamingCard index={2} />
+    </>
+  );
+}
 
-      {PAGES.map((p, i) => (
-        <NavLink
-          key={p.to}
-          to={p.to}
-          end={p.end}
-          title={`${p.label} (${i + 1})`}
-          className={({ isActive }) =>
-            clsx(
-              "group flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-medium transition-colors",
-              isActive ? "bg-[var(--chip-off)] text-text shadow-sm" : "text-text-dim hover:bg-chip hover:text-text",
-            )
-          }
-        >
-          <p.icon size={17} />
-          <span className="flex-1 truncate">{p.label}</span>
-          {badges[p.to] ? (
-            <span className="rounded-full bg-[#d9822b] px-1.5 text-[10.5px] font-bold text-white">{badges[p.to]}</span>
-          ) : (
-            <kbd className="hidden text-[10px] text-text-dim/70 group-hover:inline">{i + 1}</kbd>
+function Visitors() {
+  return (
+    <div className="max-w-4xl">
+      <VisitorsPanel />
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- Shell */
+
+function Rail() {
+  const { logout } = useHa();
+  const { open } = useOpenings();
+  const { issues } = useIssues();
+  const flags: Record<string, number> = { security: open.length + issues.filter((i) => i.severity === "danger").length };
+
+  const link = (to: string, label: string, Icon: LucideIcon, end = false, badge = 0, key?: string) => (
+    <NavLink
+      key={to}
+      to={to}
+      end={end}
+      aria-label={label}
+      className={({ isActive }) =>
+        clsx(
+          "group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+          isActive ? "bg-dx-cyan/10 text-dx-cyan" : "text-dx-faint hover:bg-white/[0.04] hover:text-dx-text",
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && <span className="absolute -left-[14px] h-5 w-[3px] rounded-r bg-dx-cyan shadow-[0_0_10px_#21e6f2]" />}
+          <Icon size={18} />
+          {badge > 0 && (
+            <span className="dx-num absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-dx-amber px-1 text-[9px] font-bold text-black">
+              {badge}
+            </span>
           )}
-        </NavLink>
-      ))}
+          <span className="pointer-events-none absolute left-[52px] z-50 whitespace-nowrap rounded border border-white/10 bg-[#0b0d16] px-2 py-1 text-[11px] font-semibold text-dx-text opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+            {label}
+            {key && <span className="dx-num ml-2 text-dx-faint">{key}</span>}
+          </span>
+        </>
+      )}
+    </NavLink>
+  );
 
-      <div className="mx-2 mb-1.5 mt-5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-text-dim">Quick actions</div>
-      {CURATED_QUICK_ACTIONS.map((a) => (
-        <button
-          key={a.key}
-          onClick={() => onRunAction(a)}
-          disabled={a.entityIds.length === 0}
-          title={a.description}
-          className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-[13.5px] font-medium text-text transition-colors hover:bg-chip active:scale-[0.98] disabled:opacity-40"
-        >
-          <a.icon size={17} style={{ color: ACTION_ACCENTS[a.key] }} />
-          {a.label}
-        </button>
-      ))}
-      <button
-        onClick={onMusic}
-        className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-[13.5px] font-medium text-text transition-colors hover:bg-chip"
+  return (
+    <nav className="relative z-20 flex w-[68px] shrink-0 flex-col items-center gap-1.5 border-r border-dx-line bg-[#090a12]/80 py-4">
+      <div
+        className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-[15px] font-bold text-black"
+        style={{ background: `linear-gradient(135deg, ${C.cyan}, ${C.pink})`, boxShadow: `0 0 18px -4px ${C.pink}` }}
       >
-        <span className="flex h-[17px] w-[17px] items-center justify-center rounded-full bg-[#1DB954] text-[9px] font-bold text-white">♪</span>
-        Play music…
-      </button>
-
-      <div className="mt-auto flex flex-col gap-0.5 border-t border-border pt-3">
-        <NavLink to="/overview" className="flex items-center gap-3 rounded-xl px-3 py-1.5 text-[12.5px] text-text-dim hover:bg-chip hover:text-text">
-          <ListTree size={15} /> All areas
-        </NavLink>
-        <NavLink to="/" className="flex items-center gap-3 rounded-xl px-3 py-1.5 text-[12.5px] text-text-dim hover:bg-chip hover:text-text">
-          <Smartphone size={15} /> Tablet layout
-        </NavLink>
-        <NavLink to="/settings" className="flex items-center gap-3 rounded-xl px-3 py-1.5 text-[12.5px] text-text-dim hover:bg-chip hover:text-text">
-          <Settings size={15} /> Settings
-        </NavLink>
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 rounded-xl px-3 py-1.5 text-left text-[12.5px] text-text-dim hover:bg-chip hover:text-text"
-        >
-          <LogOut size={15} /> Disconnect
+        H
+      </div>
+      {PAGES.map((p, i) => link(p.to, p.label, p.icon, p.key === "overview", flags[p.key] ?? 0, String(i + 1)))}
+      <div className="mt-auto flex flex-col items-center gap-1.5">
+        {link("/overview", "All areas", ListTree)}
+        {link("/", "Tablet layout", Tablet, true)}
+        {link("/settings", "Settings", Settings)}
+        <button onClick={logout} aria-label="Disconnect" title="Disconnect" className="flex h-10 w-10 items-center justify-center rounded-lg text-dx-faint hover:bg-white/[0.04] hover:text-dx-red">
+          <LogOut size={17} />
         </button>
       </div>
     </nav>
   );
 }
 
-/** Number keys 1–7 jump between pages (not while typing). */
-function usePageShortcuts() {
+function TopBar({ title, onAction, onMusic }: { title: string; onAction: (a: QuickAction) => void; onMusic: () => void }) {
+  const { entities, status, hassUrl } = useHa();
+  const now = useNow(1000);
+  const w = entities[CURATED_WEATHER_ENTITY];
+  const temp = w?.attributes.temperature as number | undefined;
+  return (
+    <header className="relative z-10 flex h-[60px] shrink-0 items-center gap-5 border-b border-dx-line bg-[#090a12]/60 px-6 backdrop-blur-md">
+      <div className="min-w-0">
+        <Label className="text-dx-faint">Home / Ops</Label>
+        <h1 className="truncate text-[19px] font-semibold uppercase tracking-[0.06em] text-dx-text">{title}</h1>
+      </div>
+
+      <div className="ml-auto flex items-center gap-1.5">
+        {CURATED_QUICK_ACTIONS.map((a) => (
+          <Btn key={a.key} onClick={() => onAction(a)} disabled={a.entityIds.length === 0} title={a.description} color={ACTION_COLORS[a.key]}>
+            <a.icon size={12} /> {a.label}
+          </Btn>
+        ))}
+        <Btn onClick={onMusic} color={C.green} title="Search Spotify and play on the living room TV">
+          <Music size={12} /> Music
+        </Btn>
+      </div>
+
+      <div className="flex items-center gap-4 border-l border-dx-line pl-5">
+        {w && (
+          <div className="flex items-center gap-1.5 text-dx-cyan">
+            {createElement(weatherIcon(w.state), { size: 16 })}
+            <span className="dx-num text-[14px] text-dx-text">{temp === undefined ? "—" : Math.round(temp)}°</span>
+          </div>
+        )}
+        <div className="flex -space-x-1.5">
+          {HOUSEHOLD_PEOPLE.map((id) => {
+            const p = entities[id];
+            if (!p) return null;
+            const home = p.state === "home";
+            const pic = p.attributes.entity_picture as string | undefined;
+            const name = (p.attributes.friendly_name as string | undefined) ?? id;
+            return (
+              <div
+                key={id}
+                title={`${name} · ${home ? "home" : p.state === "not_home" ? "away" : p.state}`}
+                className="relative h-7 w-7 rounded-full border-2"
+                style={{ borderColor: home ? C.green : C.faint }}
+              >
+                {pic ? (
+                  <img src={`${hassUrl ?? ""}${pic}`} alt="" className={clsx("h-full w-full rounded-full object-cover", !home && "grayscale opacity-60")} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-dx-raise text-[11px] font-semibold text-dx-text">{name.charAt(0)}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-right">
+          <div className="dx-num text-[17px] leading-none text-dx-text">{now.toLocaleTimeString(undefined, { hour12: false })}</div>
+          <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.12em] text-dx-dim">
+            <Dot color={status === "connected" ? C.green : C.amber} pulse={status === "connected"} />
+            {now.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/** Number keys 1–7 jump between pages (not while typing or in a dialog). */
+function useShortcuts() {
   const navigate = useNavigate();
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -380,56 +344,54 @@ function usePageShortcuts() {
 }
 
 /**
- * The desktop layout at /desktop — for a computer monitor (1280 px and up),
- * with a mouse and keyboard. Same data, night mode and weather backdrop as
- * the tablet, but much denser: a permanent nav rail instead of the drawer,
- * a KPI strip, and the detail sheets that pop up on the tablet and phone
- * (Power, Doors, On right now, the thermostat) laid out as panels — plus
- * things only this layout shows: the full weather and week forecast,
- * internet throughput, house health, indoor and 7-day power trends with
- * hover readouts.
+ * The desktop layout at /desktop: a dark, data-dense ops console for a
+ * monitor, mouse and keyboard — neon charts, gauges and timelines instead of
+ * the tablet's big touch tiles. Icon rail on the left (keys 1–7), a top bar
+ * with quick actions, weather, people and the clock, and seven pages.
  */
 export function DesktopScreen() {
-  const { entities, callService } = useHa();
+  const { callService } = useHa();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
-  const weather = entities[CURATED_WEATHER_ENTITY];
-  const isNight = isNightFor(entities["sun.sun"]?.state);
+  const [music, setMusic] = useState(false);
   const [toast, setToast] = useState<{ action: QuickAction; nonce: number } | null>(null);
-  const [musicOpen, setMusicOpen] = useState(false);
-  usePageShortcuts();
+  useShortcuts();
 
-  function runAction(action: QuickAction) {
+  const page = PAGES.find((p) => p.to === pathname.replace(/\/$/, "")) ?? PAGES[0];
+  const go = (key: string) => navigate(PAGES.find((p) => p.key === key)?.to ?? "/desktop");
+
+  function run(action: QuickAction) {
     if (action.entityIds.length === 0) return;
     callService("homeassistant", action.action, {}, { entity_id: action.entityIds }).catch(() => {});
     setToast((t) => ({ action, nonce: (t?.nonce ?? 0) + 1 }));
   }
 
+  useEffect(() => {
+    document.title = `${page.label} · Home`;
+  }, [page.label]);
+
   return (
-    <div className={clsx("relative flex h-full", isNight && "home-night")} data-sheet-root>
-      <WeatherBackground condition={weather?.state} isNight={isNight} />
-
-      {/* No z-index on either: see PhoneScreen — keeps pop-ups above them. */}
-      <div className="relative h-full">
-        <NavRail onRunAction={runAction} onMusic={() => setMusicOpen(true)} />
+    <div className="dx relative flex h-full overflow-hidden" data-sheet-root>
+      <div className="dx-grid pointer-events-none absolute inset-0" />
+      <Rail />
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <TopBar title={page.label} onAction={run} onMusic={() => setMusic(true)} />
+        <main key={pathname} className="dx-scroll min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="mx-auto flex max-w-[2200px] flex-col gap-3">
+            <Routes>
+              <Route index element={<Overview go={go} />} />
+              <Route path="rooms" element={<Rooms />} />
+              <Route path="security" element={<Security />} />
+              <Route path="energy" element={<Energy />} />
+              <Route path="devices" element={<Devices />} />
+              <Route path="insights" element={<Insights />} />
+              <Route path="visitors" element={<Visitors />} />
+            </Routes>
+          </div>
+        </main>
       </div>
-      <div key={pathname} className="relative h-full min-w-0 flex-1 overflow-y-auto px-8 pb-12 pt-7">
-        <div className="mx-auto flex max-w-[2000px] flex-col gap-5">
-          <Routes>
-            <Route index element={<OverviewPage />} />
-            <Route path="rooms" element={<RoomsPage />} />
-            <Route path="security" element={<SecurityPage />} />
-            <Route path="energy" element={<EnergyPage />} />
-            <Route path="devices" element={<DevicesPage />} />
-            <Route path="insights" element={<InsightsPage />} />
-            <Route path="visitors" element={<VisitorsPage />} />
-          </Routes>
-        </div>
-      </div>
-
-      {musicOpen && <SpotifySearchModal onClose={() => setMusicOpen(false)} />}
-      {toast && (
-        <QuickActionToast key={`${toast.action.key}-${toast.nonce}`} action={toast.action} onDismiss={() => setToast(null)} />
-      )}
+      {music && <SpotifySearchModal onClose={() => setMusic(false)} />}
+      {toast && <QuickActionToast key={`${toast.action.key}-${toast.nonce}`} action={toast.action} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

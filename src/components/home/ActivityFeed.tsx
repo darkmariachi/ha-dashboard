@@ -24,7 +24,7 @@ const TYPES: Record<string, { label: string; icon: LucideIcon; color: string }> 
   motion: { label: "Motion", icon: Activity, color: "#8a8478" },
 };
 
-function typeInfo(type: string) {
+export function typeInfo(type: string) {
   return TYPES[type] ?? { label: type.charAt(0).toUpperCase() + type.slice(1), icon: Activity, color: "#8a8478" };
 }
 
@@ -41,7 +41,7 @@ function iso(t: number) {
   return new Date(Math.round(t / 1000) * 1000).toISOString().replace(".000Z", "Z");
 }
 
-function snapshotPath(e: CameraEvent, width: number) {
+export function snapshotPath(e: CameraEvent, width: number) {
   return `/api/unifiprotect/snapshot/${PROTECT_ENTRY_ID}/${e.source.camera}/${iso(e.t + 1000)}?width=${width}`;
 }
 
@@ -85,7 +85,7 @@ export function useCameraEvents(now: Date) {
 /** <img> for an HA path that needs signing (the Protect proxy requires
  * auth); signs once per path. */
 const signedCache = new Map<string, string>();
-function SignedImg({ path, className }: { path: string; className?: string }) {
+export function SignedImg({ path, className }: { path: string; className?: string }) {
   const { signPath } = useHa();
   const [src, setSrc] = useState(() => signedCache.get(path) ?? null);
   const [failed, setFailed] = useState(false);

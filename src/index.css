@@ -17,6 +17,23 @@
   --color-text-dim: #8a8478;
   --color-chip: rgba(44, 42, 38, 0.05);
   --color-chip-hover: rgba(44, 42, 38, 0.09);
+
+  /* Desktop (/desktop) neon ops palette — used as bg-dx-panel, text-dx-cyan... */
+  --color-dx-bg: #06070c;
+  --color-dx-panel: #0d0f18;
+  --color-dx-raise: #141725;
+  --color-dx-line: rgba(255, 255, 255, 0.07);
+  --color-dx-text: #e9ebf7;
+  --color-dx-dim: #7f84a0;
+  --color-dx-faint: #484c66;
+  --color-dx-cyan: #21e6f2;
+  --color-dx-pink: #ff2fa8;
+  --color-dx-violet: #a35bff;
+  --color-dx-amber: #ffb020;
+  --color-dx-green: #2ef2a3;
+  --color-dx-red: #ff4d6d;
+  --font-dx: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
 /* Frosted-glass surfaces for the Home screen, layered over the weather
@@ -202,4 +219,76 @@ input[type="range"]::-moz-range-thumb {
 }
 .tv * {
   scrollbar-width: none;
+}
+
+/* Desktop layout (/desktop): a dark, data-dense ops console. The app's own
+ * tokens are re-pointed too, so reused components (insights, visitors,
+ * sheets) render dark and flat inside it instead of as frosted glass. */
+.dx {
+  --color-bg: #06070c;
+  --color-surface: #11131f;
+  --color-surface-hover: #181b2b;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-text: #e9ebf7;
+  --color-text-dim: #7f84a0;
+  --color-chip: rgba(255, 255, 255, 0.05);
+  --color-chip-hover: rgba(255, 255, 255, 0.09);
+  --color-accent: #21e6f2;
+  --color-accent-soft: rgba(33, 230, 242, 0.12);
+  --glass: #0d0f18;
+  --glass-edge: rgba(255, 255, 255, 0.07);
+  --glass-highlight: transparent;
+  --glass-shadow: none;
+  --tint-strength: 5%;
+  --chip-off: rgba(255, 255, 255, 0.06);
+  font-family: var(--font-dx);
+  color: var(--color-dx-text);
+  background:
+    radial-gradient(1200px 600px at 100% -10%, rgba(255, 47, 168, 0.09), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(33, 230, 242, 0.07), transparent 60%),
+    var(--color-dx-bg);
+}
+.dx-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.dx .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 10px !important;
+}
+.dx-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 120px), var(--color-dx-panel);
+  border: 1px solid var(--color-dx-line);
+  border-radius: 10px;
+}
+.dx-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.dx-glow-pink { filter: drop-shadow(0 0 6px rgba(255, 47, 168, 0.55)); }
+.dx-glow-cyan { filter: drop-shadow(0 0 6px rgba(33, 230, 242, 0.55)); }
+.dx-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.dx-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+.dx-scroll::-webkit-scrollbar-track { background: transparent; }
+.dx-in { animation: dx-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+@keyframes dx-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.dx input[type="range"].dx-range {
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-dx-violet), var(--color-dx-pink)) 0 / var(--fill, 0%) 100% no-repeat, rgba(255, 255, 255, 0.08);
+}
+.dx input[type="range"].dx-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 47, 168, 0.35), 0 0 10px rgba(255, 47, 168, 0.8);
 }

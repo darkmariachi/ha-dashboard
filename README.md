@@ -128,16 +128,28 @@ a WebRTC or HLS embed).
 
 ## On a desktop computer
 
-`/desktop` is a denser layout for a monitor, mouse and keyboard. It has a
-permanent nav rail with quick actions and music, and keys **1–7** jump
-between pages. The Overview page has a KPI strip (power, energy today,
-indoor, doors & windows, on now, internet, alarm, house health), the rooms,
-the cameras, plus house health, network and computer panels. The tablet's
-pop-up sheets (Power, Doors, On right now, the thermostat) are laid out as
-panels on the Rooms, Security and Energy pages. Charts there show a readout
-when you hover over them. Entities that only this layout uses (windows,
-smoke/CO, appliances, internet throughput, indoor sensors) are listed in
-`src/config/desktop.ts`.
+`/desktop` is a dark, data-dense "ops console" for a monitor, mouse and
+keyboard, in its own neon theme (Space Grotesk + JetBrains Mono, cyan /
+magenta / violet). Instead of the tablet's big touch tiles it uses compact
+switches, gauges, line and bar charts with hover readouts, and gantt-style
+timelines. An icon rail on the left (keys **1–7**) leads to these pages:
+
+- **Overview:** KPI strip, power flow, weather, a rooms matrix, cameras, an
+  event stream, door/window timeline, compute rings and system health.
+- **Rooms:** every switch and Hue dimmer, what's on, TVs, the vacuum and
+  irrigation.
+- **Security:** all cameras (click one for live video), the openings
+  timeline, the event stream and detections.
+- **Energy:** power flow over 6 h / 24 h / 7 d, daily kWh, the ledger,
+  per-appliance loads, the thermostat and indoor air.
+- **Devices:** computers, disks and the network.
+- **Insights:** presence and lighting hours.
+- **Visitors:** devices that joined the Wi-Fi and aren't the household's.
+
+The quick actions and music search are in the top bar. Entities that only
+this layout uses (windows, smoke/CO, appliances, internet throughput,
+indoor sensors) are in `src/config/desktop.ts`; the theme is the `.dx`
+block at the end of `src/index.css`.
 
 ## On the TV
 
