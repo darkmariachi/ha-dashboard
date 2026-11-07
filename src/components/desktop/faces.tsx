@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ImagePlus, Loader2, ScanFace, X } from "lucide-react";
+import { Check, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, X } from "lucide-react";
 import {
   HOUSEHOLD,
   IGNORE,
@@ -9,13 +9,15 @@ import {
   faceClusters,
   faceStatus,
   facesOf,
+  setAvatar,
+  subjectName,
   suggestFor,
   uploadPhotos,
   type Face,
   type FaceCluster,
   type FaceStatus,
 } from "../../lib/faces";
-import { useHouseholdNames } from "../../lib/useFaceNames";
+import { avatarsChanged, useAvatars, useHouseholdNames } from "../../lib/useFaceNames";
 import { useNow } from "../../lib/useNow";
 import { saveVisitor, type VisitLog } from "../../lib/visitors";
 import { dur } from "./data";
@@ -110,6 +112,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
+  const looks = cluster.nearest && cluster.nearest.subject !== hint?.id ? cluster.nearest : null;
   const first = cluster.times[0];
   const last = cluster.times.at(-1)!;
   const days = new Set(cluster.times.map((t) => new Date(t).toDateString())).size;
@@ -122,6 +125,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
         cluster.ids.filter((id) => !excluded.has(id)),
         subject,
       );
+      avatarsChanged();
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -168,7 +172,12 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
           <Dot color={C.green} /> {hint.name}'s phone was on the Wi-Fi for {hint.hits} of {cluster.times.length}
         </div>
       )}
-      <WhoPicker log={log} suggestion={hint?.id} busy={busy} onPick={pick} />
+      {looks && (
+        <div className="flex items-center gap-1.5 text-[10.5px] text-dx-violet">
+          <Sparkles size={11} /> Looks like {subjectName(looks.subject, log)} · {Math.round(looks.score * 100)}%
+        </div>
+      )}
+      <WhoPicker log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} />
       {error && <div className="text-[10.5px] text-dx-red">{error}</div>}
     </div>
   );
@@ -271,6 +280,7 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
 /** A person's faces: confirmed ones solid, auto-matched ones dashed with
  * confirm / reject, plus reference photo upload. */
 export function SubjectFaces({ subject, name, color }: { subject: string; name: string; color: string }) {
+  const avatar = useAvatars()[subject];
   const now = useNow(60_000).getTime();
   const [faces, setFaces] = useState<Face[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -299,7 +309,13 @@ export function SubjectFaces({ subject, name, color }: { subject: string; name: 
 
   async function set(id: number, to: string | null) {
     await assignFaces([id], to).catch(() => {});
+    avatarsChanged();
     load();
+  }
+
+  async function profile(id: number | null) {
+    await setAvatar(subject, id).catch(() => {});
+    avatarsChanged();
   }
 
   const seen = faces?.filter((f) => f.camera !== "upload") ?? [];
@@ -337,16 +353,37 @@ export function SubjectFaces({ subject, name, color }: { subject: string; name: 
               style={{ borderColor: f.label === "auto" ? `${color}88` : color }}
             >
               <img src={f.crop} alt="" className="h-full w-full object-cover" />
-              {f.label === "auto" && (
-                <div className="absolute inset-x-0 bottom-0 hidden justify-center gap-1 bg-black/70 py-0.5 group-hover:flex">
-                  <button onClick={() => set(f.id, subject)} title="Yes, that's them" className="text-dx-green">
-                    <Check size={13} />
-                  </button>
-                  <button onClick={() => set(f.id, null)} title="Not them" className="text-dx-red">
-                    <X size={13} />
-                  </button>
-                </div>
+              {avatar?.avatar_id === f.id && (
+                <span
+                  className="absolute right-0.5 top-0.5 rounded-full bg-black/70 p-0.5"
+                  title={avatar.avatar_chosen ? "Profile picture" : "Profile picture (latest face, until you pick one)"}
+                >
+                  <Star size={10} className="fill-dx-amber text-dx-amber" />
+                </span>
               )}
+              <div className="absolute inset-x-0 bottom-0 hidden justify-center gap-1.5 bg-black/75 py-0.5 group-hover:flex">
+                {f.label === "auto" && (
+                  <>
+                    <button onClick={() => set(f.id, subject)} title="Yes, that's them" className="text-dx-green">
+                      <Check size={13} />
+                    </button>
+                    <button onClick={() => set(f.id, null)} title="Not them" className="text-dx-red">
+                      <X size={13} />
+                    </button>
+                  </>
+                )}
+                {avatar?.avatar_id === f.id && avatar.avatar_chosen ? (
+                  <button onClick={() => profile(null)} title="Go back to their latest face" className="text-dx-amber">
+                    <StarOff size={13} />
+                  </button>
+                ) : (
+                  avatar?.avatar_id !== f.id && (
+                    <button onClick={() => profile(f.id)} title="Use as profile picture" className="text-dx-amber">
+                      <Star size={13} />
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           ))}
         </div>

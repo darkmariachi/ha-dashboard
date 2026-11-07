@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { HOUSEHOLD_PEOPLE } from "../config/curatedHome";
 import { useHa } from "../ha/HaProvider";
-import { faceSightings, subjectName, type Sighting } from "./faces";
+import { faceSightings, faceSubjects, subjectName, type FaceSubject, type Sighting } from "./faces";
 import { fetchVisitLog, type VisitLog } from "./visitors";
 
 /**
@@ -50,4 +50,34 @@ export function useFaceNames(hours: number) {
 export function useHouseholdNames() {
   const { entities } = useHa();
   return HOUSEHOLD_PEOPLE.map((id) => ((entities[id]?.attributes.friendly_name as string | undefined) ?? id.split(".")[1]).split(" ")[0]);
+}
+
+const AVATARS_CHANGED = "faces:avatars-changed";
+
+/** Tell every useAvatars on the page to reload (after choosing a picture or
+ * naming faces). */
+export function avatarsChanged() {
+  window.dispatchEvent(new Event(AVATARS_CHANGED));
+}
+
+/** Profile pictures by subject (visitor id / household:Name), from the face
+ * service; refreshed every few minutes and whenever avatarsChanged() fires. */
+export function useAvatars() {
+  const [subjects, setSubjects] = useState<Record<string, FaceSubject>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      faceSubjects()
+        .then((list) => !cancelled && setSubjects(Object.fromEntries(list.map((s) => [s.subject, s]))))
+        .catch(() => {});
+    load();
+    const t = setInterval(load, 5 * 60_000);
+    window.addEventListener(AVATARS_CHANGED, load);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+      window.removeEventListener(AVATARS_CHANGED, load);
+    };
+  }, []);
+  return subjects;
 }

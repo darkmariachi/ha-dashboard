@@ -20,6 +20,7 @@ import {
 } from "../../lib/visitors";
 import { Sheet } from "../home/Sheet";
 import { FaceReviewSection, PersonFaces } from "./Faces";
+import { useAvatars } from "../../lib/useFaceNames";
 
 const HOME_GREEN = "#3ee08f";
 const ACCENT = "#4f79c9";
@@ -40,7 +41,18 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Initial({ name, here }: { name: string; here: boolean }) {
+/** Their profile picture (from the face service) or their initial. */
+function Initial({ name, here, src }: { name: string; here: boolean; src?: string | null }) {
+  if (src) {
+    return (
+      <span
+        className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl"
+        style={{ boxShadow: here ? `0 0 0 2px ${HOME_GREEN}` : undefined }}
+      >
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      </span>
+    );
+  }
   return (
     <span
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-[17px] font-semibold"
@@ -68,6 +80,7 @@ function lastSeenText(visits: Session[], here: boolean, now: Date) {
  */
 export function VisitorsPanel() {
   const { entities } = useHa();
+  const avatars = useAvatars();
   const now = useNow(60_000);
   const [log, setLog] = useState<VisitLog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +167,7 @@ export function VisitorsPanel() {
       ) : (
         <div className="flex flex-col gap-3">
           {here.map(({ person: p, visits }) => (
-            <PersonRow key={p.id} person={p} text={lastSeenText(visits, true, now)} here style={rise()} onOpen={() => setOpenPerson(p.id)} />
+            <PersonRow key={p.id} person={p} avatar={avatars[p.id]?.sample} text={lastSeenText(visits, true, now)} here style={rise()} onOpen={() => setOpenPerson(p.id)} />
           ))}
         </div>
       )}
@@ -164,7 +177,7 @@ export function VisitorsPanel() {
           <SectionTitle>Recently</SectionTitle>
           <div className="flex flex-col gap-3">
             {away.map(({ person: p, visits }) => (
-              <PersonRow key={p.id} person={p} text={lastSeenText(visits, false, now)} here={false} style={rise()} onOpen={() => setOpenPerson(p.id)} />
+              <PersonRow key={p.id} person={p} avatar={avatars[p.id]?.sample} text={lastSeenText(visits, false, now)} here={false} style={rise()} onOpen={() => setOpenPerson(p.id)} />
             ))}
           </div>
         </>
@@ -255,18 +268,20 @@ function PersonRow({
   person,
   text,
   here,
+  avatar,
   style,
   onOpen,
 }: {
   person: Visitor;
   text: string;
   here: boolean;
+  avatar?: string | null;
   style: React.CSSProperties;
   onOpen: () => void;
 }) {
   return (
     <button onClick={onOpen} className="glass rise flex items-center gap-3 rounded-[26px] p-4 text-left active:scale-[0.99]" style={style}>
-      <Initial name={person.name} here={here} />
+      <Initial name={person.name} here={here} src={avatar} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[17px] font-semibold tracking-[-0.2px] text-text">{person.name}</div>
         <div className="text-[13px]" style={{ color: here ? HOME_GREEN : "var(--color-text-dim)" }}>

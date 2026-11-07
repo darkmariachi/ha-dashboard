@@ -28,6 +28,9 @@ export interface FaceCluster {
   times: number[];
   cameras: string[];
   faces: Face[];
+  /** The named person this group most resembles, when it's close but under
+   * the auto-match bar. */
+  nearest: { subject: string; score: number } | null;
 }
 
 export interface FaceSubject {
@@ -35,7 +38,11 @@ export interface FaceSubject {
   n: number;
   confirmed: number;
   last: number;
+  /** Profile picture crop: the chosen face, else their latest confirmed one. */
   sample: string | null;
+  avatar_id: number | null;
+  /** True when someone picked it (rather than the latest-face default). */
+  avatar_chosen: boolean;
 }
 
 export interface FaceStatus {
@@ -76,6 +83,7 @@ export const facesOf = (subject: string, limit = 60) => call<Face[]>(`faces?subj
 export const faceSightings = (since: number) => call<Sighting[]>(`sightings?since=${since}`);
 export const assignFaces = (ids: number[], subject: string | null) => call<{ ok: true }>("assign", { ids, subject });
 export const enrollFace = (subject: string, image: string) => call<{ ok: true; faces_in_photo: number }>("enroll", { subject, image });
+export const setAvatar = (subject: string, id: number | null) => call<{ ok: true }>("avatar", { subject, id });
 
 /** "household:Andy" -> "Andy"; visitor ids are resolved by the caller. */
 export function householdName(subject: string) {

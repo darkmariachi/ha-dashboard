@@ -20,6 +20,7 @@ import {
 } from "../../lib/visitors";
 import { Timeline } from "./charts";
 import { FaceReview, SubjectFaces } from "./faces";
+import { useAvatars } from "../../lib/useFaceNames";
 import { dur } from "./data";
 import { Big, Btn, C, Dot, Label, Panel, Switch } from "./ui";
 
@@ -224,6 +225,7 @@ function VisitorDetail({
   onRemoved: () => void;
 }) {
   const { entities } = useHa();
+  const avatar = useAvatars()[person.id]?.sample;
   const [name, setName] = useState(person.name);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -262,12 +264,21 @@ function VisitorDetail({
       }
     >
       <div className="flex flex-wrap items-center gap-3">
-        <span
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-[18px] font-bold text-black"
-          style={{ background: color, boxShadow: `0 0 16px -4px ${color}` }}
-        >
-          {person.name.trim().charAt(0).toUpperCase() || "?"}
-        </span>
+        {avatar ? (
+          <img
+            src={avatar}
+            alt=""
+            className="h-11 w-11 rounded-lg object-cover"
+            style={{ boxShadow: `0 0 0 2px ${color}, 0 0 16px -4px ${color}` }}
+          />
+        ) : (
+          <span
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-[18px] font-bold text-black"
+            style={{ background: color, boxShadow: `0 0 16px -4px ${color}` }}
+          >
+            {person.name.trim().charAt(0).toUpperCase() || "?"}
+          </span>
+        )}
         <input
           aria-label="Name"
           value={name}
@@ -481,6 +492,7 @@ function AssignRow({ entityId, log, onDone, onCancel }: { entityId: string; log:
 export function VisitorsConsole() {
   const { entities } = useHa();
   const nowDate = useNow(60_000);
+  const avatars = useAvatars();
   const now = nowDate.getTime();
   const [log, setLog] = useState<VisitLog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -610,6 +622,9 @@ export function VisitorsConsole() {
                           {active && <span className="absolute inset-y-1 left-0 w-[3px] rounded-r" style={{ background: p.color, boxShadow: `0 0 8px ${p.color}` }} />}
                           <div className="flex items-center gap-2">
                             <Dot color={p.here ? C.green : C.faint} pulse={p.here} />
+                            {avatars[p.person.id]?.sample && (
+                              <img src={avatars[p.person.id]!.sample!} alt="" className="h-5 w-5 rounded-[4px] object-cover" />
+                            )}
                             <span className="truncate font-medium text-dx-text">{p.person.name}</span>
                           </div>
                         </td>

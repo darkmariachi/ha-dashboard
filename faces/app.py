@@ -24,6 +24,7 @@ Assistant token as a Bearer header, checked against HA):
   GET  /sightings?since=             labelled faces after a time (ms)
   POST /assign   {ids: [..], subject: str | null}
   POST /enroll   {subject, image: data URL}   reference photo upload
+  POST /avatar   {subject, id | null}         choose / clear a profile picture
 """
 
 from __future__ import annotations
@@ -72,6 +73,7 @@ MAX_YAW = 55  # degrees; profiles don't match well
 # people often aren't facing the doorbell yet when Protect first flags them.
 OFFSETS: dict[str, tuple[int, ...]] = {"camera.g4_doorbell_pro_medium": (0, 2000)}
 MATCH = 0.42  # cosine similarity to call it the same person
+NEAREST = 0.28  # below MATCH: only a "looks like" hint on an unnamed group
 CLUSTER = 0.50  # similarity that links two unlabelled faces in a cluster
 PACE_S = 0.25  # pause between queue items (Protect exports each frame)
 
@@ -101,6 +103,7 @@ db.executescript(
     );
     create index if not exists faces_subject on faces(subject);
     create index if not exists faces_t on faces(t);
+    create table if not exists avatars (subject text primary key, face_id integer not null);
     """
 )
 
@@ -415,18 +418,50 @@ async def clusters(request: Request, limit: int = 40, samples: int = 8):
     groups: dict[int, list[int]] = {}
     for i in range(n):
         groups.setdefault(find(i), []).append(i)
+
+    # Closest named person per cluster, for a "looks like" hint on groups
+    # that are near someone but under the auto-match bar.
+    C, subjects = confirmed_matrix()
+    keep = [i for i, s in enumerate(subjects) if s != "ignore"]
+    C = C[keep] if C is not None and keep else None
+    subjects = [subjects[i] for i in keep]
+
     out = []
     for members in sorted(groups.values(), key=len, reverse=True)[:limit]:
         rs = [rows[i] for i in members]  # already best-quality first
+        nearest = None
+        if C is not None:
+            sims = E[members] @ C.T  # cluster faces x named faces
+            per_subject: dict[str, float] = {}
+            for j, s in enumerate(subjects):
+                # The median across the cluster's faces, of each face's best
+                # similarity to this person: one lucky face doesn't decide.
+                per_subject[s] = max(per_subject.get(s, -1.0), float(np.median(sims[:, j])))
+            best = max(per_subject.items(), key=lambda kv: kv[1], default=None)
+            if best and best[1] >= NEAREST:
+                nearest = {"subject": best[0], "score": round(best[1], 3)}
         out.append(
             {
                 "ids": [r["id"] for r in rs],
                 "times": sorted(r["t"] for r in rs),
                 "cameras": sorted({r["camera"] for r in rs}),
                 "faces": [face_json(r) for r in rs[:samples]],
+                "nearest": nearest,
             }
         )
     return out
+
+
+def avatar_for(subject: str):
+    """The face chosen as a subject's profile picture, else their latest
+    confirmed face (uploads included), else their latest matched one."""
+    row = db.execute(
+        "select f.* from avatars a join faces f on f.id = a.face_id where a.subject = ? and f.subject = ?",
+        (subject, subject),
+    ).fetchone()
+    return row or db.execute(
+        "select * from faces where subject = ? order by (label = 'confirmed') desc, t desc limit 1", (subject,)
+    ).fetchone()
 
 
 @app.get("/subjects")
@@ -437,14 +472,38 @@ async def subjects(request: Request):
             "select subject, count(*) n, sum(label = 'confirmed') confirmed, max(t) last from faces"
             " where subject is not null group by subject"
         ).fetchall()
+        chosen = {r["subject"] for r in db.execute("select subject from avatars")}
         out = []
         for r in rows:
-            best = db.execute(
-                "select * from faces where subject = ? order by (label = 'confirmed') desc, det * size desc limit 1",
-                (r["subject"],),
-            ).fetchone()
-            out.append({**dict(r), "sample": face_json(best)["crop"] if best else None})
+            face = avatar_for(r["subject"])
+            out.append(
+                {
+                    **dict(r),
+                    "sample": face_json(face)["crop"] if face else None,
+                    "avatar_id": face["id"] if face else None,
+                    "avatar_chosen": r["subject"] in chosen,
+                }
+            )
     return out
+
+
+@app.post("/avatar")
+async def set_avatar(request: Request):
+    """Choose (id) or clear (id null) a subject's profile picture."""
+    await require_ha_token(request)
+    body = await request.json()
+    subject, face_id = body.get("subject"), body.get("id")
+    if not isinstance(subject, str) or not subject:
+        raise HTTPException(400, "subject required")
+    with db_lock:
+        if face_id is None:
+            db.execute("delete from avatars where subject = ?", (subject,))
+        else:
+            if not db.execute("select 1 from faces where id = ? and subject = ?", (int(face_id), subject)).fetchone():
+                raise HTTPException(400, "that face isn't theirs")
+            db.execute("insert or replace into avatars(subject, face_id) values (?, ?)", (subject, int(face_id)))
+        db.commit()
+    return {"ok": True}
 
 
 @app.get("/faces")

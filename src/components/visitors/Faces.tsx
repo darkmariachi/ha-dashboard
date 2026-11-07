@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ImagePlus, Loader2, ScanFace, Wifi, X } from "lucide-react";
+import { Check, ImagePlus, Loader2, ScanFace, Sparkles, Star, Wifi, X } from "lucide-react";
 import {
   HOUSEHOLD,
   IGNORE,
@@ -9,13 +9,15 @@ import {
   faceClusters,
   faceStatus,
   facesOf,
+  setAvatar,
+  subjectName,
   suggestFor,
   uploadPhotos,
   type Face,
   type FaceCluster,
   type FaceStatus,
 } from "../../lib/faces";
-import { useHouseholdNames } from "../../lib/useFaceNames";
+import { avatarsChanged, useAvatars, useHouseholdNames } from "../../lib/useFaceNames";
 import { useNow } from "../../lib/useNow";
 import { saveVisitor, type VisitLog } from "../../lib/visitors";
 
@@ -105,6 +107,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
+  const looks = cluster.nearest && cluster.nearest.subject !== hint?.id ? cluster.nearest : null;
   const days = new Set(cluster.times.map((t) => new Date(t).toDateString())).size;
   const first = cluster.times[0];
   const last = cluster.times.at(-1)!;
@@ -118,6 +121,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
         subject,
       );
       navigator.vibrate?.(10);
+      avatarsChanged();
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -160,8 +164,13 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
           <Wifi size={14} /> {hint.name}'s phone was on the Wi-Fi for {hint.hits} of these
         </div>
       )}
+      {looks && (
+        <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: ACCENT }}>
+          <Sparkles size={14} /> Looks like {subjectName(looks.subject, log)} ({Math.round(looks.score * 100)}% similar)
+        </div>
+      )}
       {excluded.size > 0 && <div className="text-xs text-text-dim">{excluded.size} left out — tap a face to put it back.</div>}
-      <WhoSelect log={log} suggestion={hint?.id} busy={busy} onPick={pick} />
+      <WhoSelect log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} />
       {error && <div className="text-xs text-[#ff6b6b]">{error}</div>}
     </div>
   );
@@ -249,6 +258,7 @@ export function FaceReviewSection({ log, onChanged, title }: { log: VisitLog; on
 /** A visitor's faces in their sheet: confirm or reject automatic matches,
  * and add reference photos from the camera roll. */
 export function PersonFaces({ subject, name }: { subject: string; name: string }) {
+  const avatar = useAvatars()[subject];
   const [faces, setFaces] = useState<Face[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -274,7 +284,13 @@ export function PersonFaces({ subject, name }: { subject: string; name: string }
   async function set(id: number, to: string | null) {
     setOpen(null);
     await assignFaces([id], to).catch(() => {});
+    avatarsChanged();
     load();
+  }
+
+  async function profile(id: number | null) {
+    await setAvatar(subject, id).catch(() => {});
+    avatarsChanged();
   }
 
   const seen = faces?.find((f) => f.camera !== "upload");
@@ -308,6 +324,11 @@ export function PersonFaces({ subject, name }: { subject: string; name: string }
               style={{ borderColor: f.label === "auto" ? `${ACCENT}99` : ACCENT }}
             >
               <img src={f.crop} alt="" className="h-full w-full object-cover" />
+              {avatar?.avatar_id === f.id && (
+                <span className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5" title="Profile picture">
+                  <Star size={11} className="fill-[#ffcf5a] text-[#ffcf5a]" />
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -326,6 +347,25 @@ export function PersonFaces({ subject, name }: { subject: string; name: string }
           <button onClick={() => set(selected.id, null)} className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-[#ff6b6b]">
             Not {name.split(" ")[0]}
           </button>
+        </div>
+      )}
+      {selected && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-chip px-3 py-2.5 text-sm">
+          <span className="flex items-center gap-1.5 text-text-dim">
+            <Star size={14} className={avatar?.avatar_id === selected.id ? "fill-[#ffcf5a] text-[#ffcf5a]" : ""} />
+            {avatar?.avatar_id === selected.id ? (avatar.avatar_chosen ? "Profile picture" : "Profile picture (latest)") : "Profile picture"}
+          </span>
+          {avatar?.avatar_id === selected.id ? (
+            avatar.avatar_chosen && (
+              <button onClick={() => profile(null)} className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-text">
+                Use latest instead
+              </button>
+            )
+          ) : (
+            <button onClick={() => profile(selected.id)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ background: ACCENT }}>
+              Use this one
+            </button>
+          )}
         </div>
       )}
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => upload(e.target.files).finally(() => (e.target.value = ""))} />
