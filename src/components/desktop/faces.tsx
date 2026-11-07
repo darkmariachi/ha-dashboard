@@ -1,0 +1,460 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
+import { Check, ImagePlus, Loader2, ScanFace, X } from "lucide-react";
+import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
+import { useHa } from "../../ha/HaProvider";
+import {
+  HOUSEHOLD,
+  IGNORE,
+  assignFaces,
+  enrollFace,
+  faceClusters,
+  faceSightings,
+  faceStatus,
+  facesOf,
+  householdName,
+  type Face,
+  type FaceCluster,
+  type FaceStatus,
+  type Sighting,
+} from "../../lib/faces";
+import { useNow } from "../../lib/useNow";
+import { fetchVisitLog, saveVisitor, visitsOf, type VisitLog } from "../../lib/visitors";
+import { dur } from "./data";
+import { Btn, C, Dot, Label, Panel } from "./ui";
+
+const CAMERA_LABEL: Record<string, string> = {
+  "camera.g4_doorbell_pro_medium": "Front door",
+  "camera.driveway_medium": "Driveway",
+  upload: "Uploaded",
+};
+const camLabel = (c: string) => CAMERA_LABEL[c] ?? c;
+const when = (t: number) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** A visitor phone on the Wi-Fi around a face's time counts as a hint: from
+ * 20 min before it joined (they're at the door first) to 5 min after it
+ * left. */
+const BEFORE_JOIN = 20 * 60_000;
+const AFTER_LEAVE = 5 * 60_000;
+
+function useHouseholdNames() {
+  const { entities } = useHa();
+  return HOUSEHOLD_PEOPLE.map((id) => ((entities[id]?.attributes.friendly_name as string | undefined) ?? id.split(".")[1]).split(" ")[0]);
+}
+
+/** Display name for a subject string. */
+export function subjectName(subject: string | null, log: VisitLog | null) {
+  if (!subject) return null;
+  if (subject === IGNORE) return "Ignored";
+  return householdName(subject) ?? log?.people.find((p) => p.id === subject)?.name ?? subject;
+}
+
+/* --------------------------------------------------------- who-is-this */
+
+const NEW_VISITOR = "__new_visitor";
+const NEW_HOUSEHOLD = "__household_other";
+
+/** Picker for who a set of faces belongs to; creates a visitor if asked. */
+function WhoPicker({
+  log,
+  suggestion,
+  busy,
+  onPick,
+}: {
+  log: VisitLog;
+  suggestion?: string;
+  busy?: boolean;
+  onPick: (subject: string) => void;
+}) {
+  const household = useHouseholdNames();
+  const [value, setValue] = useState(suggestion ?? "");
+  const [name, setName] = useState("");
+  const naming = value === NEW_VISITOR || value === NEW_HOUSEHOLD;
+
+  async function apply() {
+    if (value === NEW_VISITOR) {
+      if (!name.trim()) return;
+      const p = await saveVisitor({ name: name.trim(), devices: [], notify: false });
+      onPick(p.id);
+    } else if (value === NEW_HOUSEHOLD) {
+      if (name.trim()) onPick(`${HOUSEHOLD}${name.trim()}`);
+    } else if (value) onPick(value);
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <select
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="rounded-md border border-dx-line bg-dx-raise px-2 py-1 text-[11.5px] text-dx-text outline-none focus:border-dx-cyan/60"
+      >
+        <option value="">Who is this?</option>
+        {log.people.length > 0 && (
+          <optgroup label="Visitors">
+            {log.people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="Household">
+          {household.map((n) => (
+            <option key={n} value={`${HOUSEHOLD}${n}`}>
+              {n}
+            </option>
+          ))}
+          <option value={NEW_HOUSEHOLD}>Someone else in the household…</option>
+        </optgroup>
+        <option value={NEW_VISITOR}>New visitor…</option>
+        <option value={IGNORE}>Not useful / ignore</option>
+      </select>
+      {naming && (
+        <input
+          autoFocus
+          value={name}
+          maxLength={40}
+          placeholder="Name"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply()}
+          className="w-32 rounded-md border border-dx-line bg-dx-raise px-2 py-1 text-[11.5px] text-dx-text outline-none placeholder:text-dx-faint focus:border-dx-cyan/60"
+        />
+      )}
+      <Btn color={C.cyan} disabled={busy || !value || (naming && !name.trim())} onClick={apply}>
+        {busy ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
+      </Btn>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------- review panel */
+
+function suggestFor(cluster: FaceCluster, log: VisitLog, now: number) {
+  let best: { id: string; name: string; hits: number } | null = null;
+  for (const p of log.people) {
+    const visits = visitsOf(p.devices, log.sessions);
+    const hits = cluster.times.filter((t) => visits.some((v) => t >= v.start - BEFORE_JOIN && t <= (v.end ?? now) + AFTER_LEAVE)).length;
+    if (hits > (best?.hits ?? 0)) best = { id: p.id, name: p.name, hits };
+  }
+  if (!best || best.hits < Math.max(2, Math.ceil(cluster.times.length * 0.4))) return null;
+  return best;
+}
+
+function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log: VisitLog; now: number; onDone: () => void }) {
+  const [excluded, setExcluded] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
+  const first = cluster.times[0];
+  const last = cluster.times.at(-1)!;
+  const days = new Set(cluster.times.map((t) => new Date(t).toDateString())).size;
+
+  async function pick(subject: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await assignFaces(
+        cluster.ids.filter((id) => !excluded.has(id)),
+        subject,
+      );
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-dx-line bg-white/[0.015] p-2.5">
+      <div className="grid grid-cols-4 gap-1">
+        {cluster.faces.map((f) => {
+          const out = excluded.has(f.id);
+          return (
+            <button
+              key={f.id}
+              onClick={() =>
+                setExcluded((s) => {
+                  const n = new Set(s);
+                  if (n.has(f.id)) n.delete(f.id);
+                  else n.add(f.id);
+                  return n;
+                })
+              }
+              title={`${camLabel(f.camera)} · ${when(f.t)}${out ? " · left out" : " · click to leave this one out"}`}
+              className="relative aspect-square overflow-hidden rounded-[4px] bg-black"
+            >
+              <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", out && "opacity-25 grayscale")} />
+              {out && <X size={16} className="absolute inset-0 m-auto text-dx-red" />}
+            </button>
+          );
+        })}
+      </div>
+      <div className="dx-num flex flex-wrap items-center gap-x-2 text-[10.5px] text-dx-dim">
+        <span className="text-dx-text">{cluster.ids.length}×</span>
+        <span>{days} {days === 1 ? "day" : "days"}</span>
+        <span className="text-dx-faint">
+          {new Date(first).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          {days > 1 && ` – ${new Date(last).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+        </span>
+        <span className="text-dx-faint">{cluster.cameras.map(camLabel).join(", ")}</span>
+      </div>
+      {hint && (
+        <div className="flex items-center gap-1.5 text-[10.5px] text-dx-green">
+          <Dot color={C.green} /> {hint.name}'s phone was on the Wi-Fi for {hint.hits} of {cluster.times.length}
+        </div>
+      )}
+      <WhoPicker log={log} suggestion={hint?.id} busy={busy} onPick={pick} />
+      {error && <div className="text-[10.5px] text-dx-red">{error}</div>}
+    </div>
+  );
+}
+
+/** Unknown faces grouped by likeness, to name in bulk. */
+export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () => void }) {
+  const now = useNow(60_000).getTime();
+  const [clusters, setClusters] = useState<FaceCluster[] | null>(null);
+  const [status, setStatus] = useState<FaceStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState(24);
+
+  const load = useCallback(() => {
+    faceStatus().then(setStatus).catch((e: Error) => setError(e.message));
+    faceClusters(limit)
+      .then((c) => {
+        setClusters(c);
+        setError(null);
+      })
+      .catch((e: Error) => setError(e.message));
+  }, [limit]);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const q = status?.queue ?? {};
+  const pending = q.pending ?? 0;
+  const done = q.done ?? 0;
+  const total = pending + done + (q.failed ?? 0);
+  const unknown = status?.faces.unknown ?? 0;
+  const shown = (clusters ?? []).filter((c) => c.ids.length > 0);
+
+  return (
+    <Panel
+      title="Faces · review"
+      icon={ScanFace}
+      accent={C.violet}
+      delay={140}
+      right={
+        status && (
+          <span className="dx-num flex items-center gap-3 text-[10.5px] text-dx-dim">
+            {pending > 0 && (
+              <span className="flex items-center gap-1.5 text-dx-amber">
+                <Loader2 size={11} className="animate-spin" /> scanning {done}/{total} frames
+              </span>
+            )}
+            <span>
+              {status.faces.n ?? 0} faces · {unknown} unnamed · {status.faces.confirmed ?? 0} confirmed · {status.faces.auto ?? 0} matched
+            </span>
+            {!status.model.startsWith("ready") && <span className="text-dx-amber">model {status.model}</span>}
+          </span>
+        )
+      }
+    >
+      {error && !clusters ? (
+        <div className="text-[12px] text-dx-red">Couldn't reach the face service: {error}</div>
+      ) : !clusters ? (
+        <div className="h-32 animate-pulse rounded bg-white/[0.03]" />
+      ) : shown.length === 0 ? (
+        <div className="py-4 text-[12px] text-dx-dim">
+          {pending > 0 ? "Scanning past doorbell and driveway detections; faces show up here as they're found." : "Every face found so far has a name."}
+        </div>
+      ) : (
+        <>
+          <p className="mb-3 text-[11px] text-dx-faint">
+            Faces from person detections at the front door and driveway, grouped by likeness. Name a group once and future sightings are matched
+            automatically. Click a face to leave it out of the group.
+          </p>
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
+            {shown.map((c) => (
+              <ClusterCard
+                key={c.ids[0]}
+                cluster={c}
+                log={log}
+                now={now}
+                onDone={() => {
+                  onChanged();
+                  load();
+                }}
+              />
+            ))}
+          </div>
+          {clusters.length >= limit && (
+            <div className="mt-3 text-center">
+              <Btn onClick={() => setLimit((l) => l + 24)}>Show more groups</Btn>
+            </div>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/* ------------------------------------------------------ visitor gallery */
+
+/** Downscale a picked photo before upload (phones shoot 12 MP+). */
+function readScaled(file: File, max = 1600): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * s);
+      c.height = Math.round(img.height * s);
+      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL("image/jpeg", 0.9));
+    };
+    img.onerror = () => reject(new Error("Couldn't read that image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/** A person's faces: confirmed ones solid, auto-matched ones dashed with
+ * confirm / reject, plus reference photo upload. */
+export function SubjectFaces({ subject, name, color }: { subject: string; name: string; color: string }) {
+  const now = useNow(60_000).getTime();
+  const [faces, setFaces] = useState<Face[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(() => {
+    facesOf(subject, 48)
+      .then(setFaces)
+      .catch(() => setFaces([]));
+  }, [subject]);
+  useEffect(() => {
+    setFaces(null);
+    setMessage(null);
+    load();
+  }, [load]);
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true);
+    setMessage(null);
+    let ok = 0;
+    const errors: string[] = [];
+    for (const f of [...files].slice(0, 10)) {
+      try {
+        await enrollFace(subject, await readScaled(f));
+        ok++;
+      } catch (e) {
+        errors.push(`${f.name}: ${(e as Error).message}`);
+      }
+    }
+    setBusy(false);
+    setMessage([ok ? `Added ${ok} reference ${ok === 1 ? "photo" : "photos"}.` : "", ...errors].filter(Boolean).join(" "));
+    load();
+  }
+
+  async function set(id: number, to: string | null) {
+    await assignFaces([id], to).catch(() => {});
+    load();
+  }
+
+  const seen = faces?.filter((f) => f.camera !== "upload") ?? [];
+  const lastSeen = seen[0];
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-2">
+        <Label className="flex-1">
+          Faces{faces ? ` · ${faces.length}${faces.length >= 48 ? "+" : ""}` : ""}
+          {lastSeen && (
+            <span className="ml-2 normal-case tracking-normal text-dx-faint">
+              last at the {camLabel(lastSeen.camera).toLowerCase()} {dur(now - lastSeen.t)} ago
+            </span>
+          )}
+        </Label>
+        <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => upload(e.target.files).finally(() => (e.target.value = ""))} />
+        <Btn onClick={() => file.current?.click()} disabled={busy} title={`Upload clear photos of ${name}'s face`}>
+          {busy ? <Loader2 size={11} className="animate-spin" /> : <ImagePlus size={11} />} Add photos
+        </Btn>
+      </div>
+      {!faces ? (
+        <div className="h-16 animate-pulse rounded bg-white/[0.03]" />
+      ) : faces.length === 0 ? (
+        <div className="rounded-md border border-dashed border-dx-line px-3 py-3 text-[11.5px] text-dx-dim">
+          No faces yet. Name a group under Faces · review, or add a few clear photos.
+        </div>
+      ) : (
+        <div className="dx-scroll grid max-h-[220px] grid-cols-8 gap-1 overflow-y-auto pr-1">
+          {faces.map((f) => (
+            <div
+              key={f.id}
+              title={`${camLabel(f.camera)} · ${when(f.t)}${f.label === "auto" ? ` · matched ${Math.round(f.score * 100)}%` : ""}`}
+              className={clsx("group relative aspect-square overflow-hidden rounded-[4px] border bg-black", f.label === "auto" ? "border-dashed" : "border-solid")}
+              style={{ borderColor: f.label === "auto" ? `${color}88` : color }}
+            >
+              <img src={f.crop} alt="" className="h-full w-full object-cover" />
+              {f.label === "auto" && (
+                <div className="absolute inset-x-0 bottom-0 hidden justify-center gap-1 bg-black/70 py-0.5 group-hover:flex">
+                  <button onClick={() => set(f.id, subject)} title="Yes, that's them" className="text-dx-green">
+                    <Check size={13} />
+                  </button>
+                  <button onClick={() => set(f.id, null)} title="Not them" className="text-dx-red">
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {message && <div className="mt-1.5 text-[10.5px] text-dx-dim">{message}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------------------- names for the event stream */
+
+/** Who was recognised at a camera around a time: for labelling detections
+ * in the event stream ("Sandra · Front door"). */
+export function useFaceNames(hours: number) {
+  const [sightings, setSightings] = useState<Sighting[]>([]);
+  const [log, setLog] = useState<VisitLog | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    function load() {
+      faceSightings(Date.now() - hours * 3600_000)
+        .then((s) => !cancelled && setSightings(s))
+        .catch(() => {});
+      fetchVisitLog()
+        .then((l) => !cancelled && setLog(l))
+        .catch(() => {});
+    }
+    load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [hours]);
+
+  return useCallback(
+    (camera: string, t: number) => {
+      const names = new Set<string>();
+      for (const s of sightings) {
+        if (s.camera === camera && Math.abs(s.t - t) <= 4000) {
+          const n = subjectName(s.subject, log);
+          if (n) names.add(n);
+        }
+      }
+      return names.size ? [...names].join(", ") : null;
+    },
+    [sightings, log],
+  );
+}

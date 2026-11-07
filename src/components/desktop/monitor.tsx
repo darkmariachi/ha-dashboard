@@ -28,6 +28,7 @@ import { useEntityHistory } from "../home/useEntityHistory";
 import { useStateHistory } from "../home/useStateHistory";
 import { useWeatherForecast, type ForecastEntry } from "../home/useWeatherForecast";
 import { BarChart, LineChart, Spark, Timeline } from "./charts";
+import { useFaceNames } from "./faces";
 import { clock, computerOnline, dur, fmtMbps, fmtW, isLive, num, rateOf, SENSE, spans, throughputSource, toMbps, useIssues, useOpenings } from "./data";
 import { Big, C, Dot, KV, Label, Panel, Ring, Segmented } from "./ui";
 
@@ -474,6 +475,7 @@ export function EventStream({ delay = 0, className, hours = 24 }: { delay?: numb
   const { all } = useOpenings();
   const history = useStateHistory(all.map((d) => d.entityId), hours, { refreshMs: 60_000 });
   const camera = useCameraEvents(now);
+  const faceName = useFaceNames(hours);
   const events: StreamEvent[] = [];
   for (const d of all) {
     const pts = history?.[d.entityId] ?? [];
@@ -489,7 +491,14 @@ export function EventStream({ delay = 0, className, hours = 24 }: { delay?: numb
   }
   for (const e of camera ?? []) {
     const info = typeInfo(e.type);
-    events.push({ t: e.t, tag: info.label.toUpperCase().slice(0, 6), color: e.type === "ring" ? C.pink : e.type === "person" ? C.violet : C.cyan, text: e.source.label });
+    // Person / ring detections the face service recognised get the name.
+    const who = e.type === "person" || e.type === "ring" ? faceName(e.source.camera, e.t) : null;
+    events.push({
+      t: e.t,
+      tag: info.label.toUpperCase().slice(0, 6),
+      color: e.type === "ring" ? C.pink : e.type === "person" ? C.violet : C.cyan,
+      text: who ? `${who} · ${e.source.label}` : e.source.label,
+    });
   }
   events.sort((a, b) => b.t - a.t);
 

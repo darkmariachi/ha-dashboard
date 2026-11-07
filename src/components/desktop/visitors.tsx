@@ -19,6 +19,7 @@ import {
   type Visitor,
 } from "../../lib/visitors";
 import { Timeline } from "./charts";
+import { FaceReview, SubjectFaces } from "./faces";
 import { dur } from "./data";
 import { Big, Btn, C, Dot, Label, Panel, Switch } from "./ui";
 
@@ -311,6 +312,10 @@ function VisitorDetail({
       <div className="mt-4">
         <Label className="mb-1.5">When they're here · last {WINDOW_DAYS} days by hour</Label>
         <PresenceHeatmap visits={month} now={now} color={color} />
+      </div>
+
+      <div className="mt-4">
+        <SubjectFaces subject={person.id} name={person.name} color={color} />
       </div>
 
       <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -729,6 +734,8 @@ export function VisitorsConsole() {
           )}
         </div>
       </div>
+
+      <FaceReview log={log} onChanged={refresh} />
 
       {people.length > 0 && (
         <Panel title={`All visits · ${WINDOW_DAYS} days`} icon={History} accent={C.pink} delay={160}>
