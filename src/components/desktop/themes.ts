@@ -94,7 +94,7 @@ export const DESKTOP_THEMES: DesktopTheme[] = [
     mark: "V",
     palette: {
       bg: "#140a26",
-      panel: "rgba(30, 14, 52, 0.78)",
+      panel: "rgba(28, 12, 48, 0.93)",
       raise: "#2a1747",
       line: "rgba(255, 120, 200, 0.16)",
       text: "#fff1fb",

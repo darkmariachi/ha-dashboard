@@ -199,8 +199,6 @@
   border-radius: 16px;
   border-color: rgba(255, 120, 200, 0.22);
   background: linear-gradient(160deg, rgba(255, 63, 159, 0.07), transparent 40%), var(--color-dx-panel);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
   box-shadow: 0 0 30px -14px rgba(255, 63, 159, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .dx[data-dx-theme="vice"] .dx-panel-head { border-bottom-color: rgba(255, 120, 200, 0.14); }
@@ -217,7 +215,7 @@
   border-radius: 50% !important;
   background: linear-gradient(180deg, #ffd56b, #ff3f9f) !important;
 }
-.dx[data-dx-theme="vice"] .dx-rail { background: rgba(20, 8, 38, 0.6); backdrop-filter: blur(12px); border-right-color: rgba(255, 120, 200, 0.18); }
+.dx[data-dx-theme="vice"] .dx-rail { background: rgba(20, 8, 38, 0.88); border-right-color: rgba(255, 120, 200, 0.18); }
 .dx[data-dx-theme="vice"] .dx-topbar { background: rgba(20, 8, 38, 0.45); border-bottom-color: rgba(255, 120, 200, 0.18); }
 .dx[data-dx-theme="vice"] .dx-nav { border-radius: 999px; }
 .dx[data-dx-theme="vice"] .dx-logo {
