@@ -3,6 +3,21 @@ import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-d
 import clsx from "clsx";
 import "@fontsource-variable/space-grotesk";
 import "@fontsource-variable/jetbrains-mono";
+import "@fontsource/rajdhani/500.css";
+import "@fontsource/rajdhani/700.css";
+import "@fontsource/share-tech-mono";
+import "@fontsource/righteous";
+import "@fontsource/pacifico";
+import "@fontsource-variable/outfit";
+import "@fontsource/bebas-neue";
+import "@fontsource/barlow/400.css";
+import "@fontsource/barlow/500.css";
+import "@fontsource/barlow/600.css";
+import "@fontsource/barlow/700.css";
+import "@fontsource/barlow-condensed/500.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource-variable/cinzel";
+import "./themes.css";
 import {
   Cctv,
   ChartColumn,
@@ -12,6 +27,7 @@ import {
   ListTree,
   LogOut,
   Music,
+  Palette,
   Settings,
   Tablet,
   Users,
@@ -43,6 +59,8 @@ import {
   WeatherPanel,
 } from "./monitor";
 import { Btn, C, Dot, Label } from "./ui";
+import { ThemePicker } from "./ThemePicker";
+import { themeVars, useDesktopTheme, type DesktopTheme } from "./themes";
 
 interface Page {
   key: string;
@@ -61,7 +79,7 @@ const PAGES: Page[] = [
   { key: "visitors", to: "/desktop/visitors", label: "Visitors", icon: Users },
 ];
 
-const ACTION_COLORS: Record<string, string> = { leaving: C.amber, party: C.pink, good_night: C.violet };
+const ACTION_COLORS = (): Record<string, string> => ({ leaving: C.amber, party: C.pink, good_night: C.violet });
 
 /** A panel that fills its grid cell instead of sizing it (so a long list
  * scrolls inside rather than stretching the row). */
@@ -206,7 +224,7 @@ function Visitors() {
 
 /* --------------------------------------------------------------- Shell */
 
-function Rail() {
+function Rail({ theme }: { theme: DesktopTheme }) {
   const { logout } = useHa();
   const { open } = useOpenings();
   const { issues } = useIssues();
@@ -220,21 +238,21 @@ function Rail() {
       aria-label={label}
       className={({ isActive }) =>
         clsx(
-          "group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
-          isActive ? "bg-dx-cyan/10 text-dx-cyan" : "text-dx-faint hover:bg-white/[0.04] hover:text-dx-text",
+          "dx-nav group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+          isActive ? "active bg-dx-primary/10 text-dx-primary" : "text-dx-faint hover:bg-white/[0.04] hover:text-dx-text",
         )
       }
     >
       {({ isActive }) => (
         <>
-          {isActive && <span className="absolute -left-[14px] h-5 w-[3px] rounded-r bg-dx-cyan shadow-[0_0_10px_#21e6f2]" />}
+          {isActive && <span className="absolute -left-[14px] h-5 w-[3px] rounded-r bg-dx-primary shadow-[0_0_10px_var(--color-dx-primary)]" />}
           <Icon size={18} />
           {badge > 0 && (
             <span className="dx-num absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-dx-amber px-1 text-[9px] font-bold text-black">
               {badge}
             </span>
           )}
-          <span className="pointer-events-none absolute left-[52px] z-50 whitespace-nowrap rounded border border-white/10 bg-[#0b0d16] px-2 py-1 text-[11px] font-semibold text-dx-text opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+          <span className="pointer-events-none absolute left-[52px] z-50 whitespace-nowrap rounded border border-white/10 bg-dx-bg px-2 py-1 text-[11px] font-semibold text-dx-text opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
             {label}
             {key && <span className="dx-num ml-2 text-dx-faint">{key}</span>}
           </span>
@@ -244,13 +262,8 @@ function Rail() {
   );
 
   return (
-    <nav className="relative z-20 flex w-[68px] shrink-0 flex-col items-center gap-1.5 border-r border-dx-line bg-[#090a12]/80 py-4">
-      <div
-        className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-[15px] font-bold text-black"
-        style={{ background: `linear-gradient(135deg, ${C.cyan}, ${C.pink})`, boxShadow: `0 0 18px -4px ${C.pink}` }}
-      >
-        H
-      </div>
+    <nav className="dx-rail relative z-20 flex w-[68px] shrink-0 flex-col items-center gap-1.5 border-r border-dx-line py-4">
+      <div className="dx-logo mb-4 flex h-10 w-10 items-center justify-center rounded-lg text-[15px] font-bold">{theme.mark}</div>
       {PAGES.map((p, i) => link(p.to, p.label, p.icon, p.key === "overview", flags[p.key] ?? 0, String(i + 1)))}
       <div className="mt-auto flex flex-col items-center gap-1.5">
         {link("/overview", "All areas", ListTree)}
@@ -264,26 +277,39 @@ function Rail() {
   );
 }
 
-function TopBar({ title, onAction, onMusic }: { title: string; onAction: (a: QuickAction) => void; onMusic: () => void }) {
+function TopBar({
+  title,
+  onAction,
+  onMusic,
+  onThemes,
+}: {
+  title: string;
+  onAction: (a: QuickAction) => void;
+  onMusic: () => void;
+  onThemes: () => void;
+}) {
   const { entities, status, hassUrl } = useHa();
   const now = useNow(1000);
   const w = entities[CURATED_WEATHER_ENTITY];
   const temp = w?.attributes.temperature as number | undefined;
   return (
-    <header className="relative z-10 flex h-[60px] shrink-0 items-center gap-5 border-b border-dx-line bg-[#090a12]/60 px-6 backdrop-blur-md">
+    <header className="dx-topbar relative z-10 flex h-[60px] shrink-0 items-center gap-5 border-b border-dx-line px-6 backdrop-blur-md">
       <div className="min-w-0">
         <Label className="text-dx-faint">Home / Ops</Label>
-        <h1 className="truncate text-[19px] font-semibold uppercase tracking-[0.06em] text-dx-text">{title}</h1>
+        <h1 className="dx-h1 truncate text-[19px] font-semibold uppercase tracking-[0.06em] text-dx-text">{title}</h1>
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
         {CURATED_QUICK_ACTIONS.map((a) => (
-          <Btn key={a.key} onClick={() => onAction(a)} disabled={a.entityIds.length === 0} title={a.description} color={ACTION_COLORS[a.key]}>
+          <Btn key={a.key} onClick={() => onAction(a)} disabled={a.entityIds.length === 0} title={a.description} color={ACTION_COLORS()[a.key]}>
             <a.icon size={12} /> {a.label}
           </Btn>
         ))}
         <Btn onClick={onMusic} color={C.green} title="Search Spotify and play on the living room TV">
           <Music size={12} /> Music
+        </Btn>
+        <Btn onClick={onThemes} title="Change the theme (T)">
+          <Palette size={12} /> Theme
         </Btn>
       </div>
 
@@ -330,7 +356,7 @@ function TopBar({ title, onAction, onMusic }: { title: string; onAction: (a: Qui
 }
 
 /** Number keys 1–7 jump between pages (not while typing or in a dialog). */
-function useShortcuts() {
+function useShortcuts(cycleTheme: () => void) {
   const navigate = useNavigate();
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -338,12 +364,13 @@ function useShortcuts() {
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
       if (document.querySelector('[role="dialog"]')) return;
+      if (e.key === "t" || e.key === "T") return cycleTheme();
       const i = Number(e.key) - 1;
       if (Number.isInteger(i) && i >= 0 && i < PAGES.length) navigate(PAGES[i].to);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate]);
+  }, [navigate, cycleTheme]);
 }
 
 /**
@@ -358,7 +385,9 @@ export function DesktopScreen() {
   const { pathname } = useLocation();
   const [music, setMusic] = useState(false);
   const [toast, setToast] = useState<{ action: QuickAction; nonce: number } | null>(null);
-  useShortcuts();
+  const [picking, setPicking] = useState(false);
+  const { theme, setTheme, cycle } = useDesktopTheme();
+  useShortcuts(cycle);
 
   const page = PAGES.find((p) => p.to === pathname.replace(/\/$/, "")) ?? PAGES[0];
   const go = (key: string) => navigate(PAGES.find((p) => p.key === key)?.to ?? "/desktop");
@@ -374,12 +403,12 @@ export function DesktopScreen() {
   }, [page.label]);
 
   return (
-    <div className="dx relative flex h-full overflow-hidden" data-sheet-root>
-      <div className="dx-grid pointer-events-none absolute inset-0" />
-      <Rail />
+    <div className="dx relative flex h-full overflow-hidden" data-sheet-root data-dx-theme={theme.id} style={themeVars(theme)}>
+      <div className="dx-fx" />
+      <Rail theme={theme} />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <TopBar title={page.label} onAction={run} onMusic={() => setMusic(true)} />
-        <main key={pathname} className="dx-scroll min-h-0 flex-1 overflow-y-auto p-5">
+        <TopBar title={page.label} onAction={run} onMusic={() => setMusic(true)} onThemes={() => setPicking(true)} />
+        <main key={`${pathname}:${theme.id}`} className="dx-scroll min-h-0 flex-1 overflow-y-auto p-5">
           <div className="mx-auto flex max-w-[2200px] flex-col gap-3">
             <Routes>
               <Route index element={<Overview go={go} />} />
@@ -394,6 +423,7 @@ export function DesktopScreen() {
         </main>
       </div>
       {music && <SpotifySearchModal onClose={() => setMusic(false)} />}
+      {picking && <ThemePicker current={theme.id} onPick={setTheme} onClose={() => setPicking(false)} />}
       {toast && <QuickActionToast key={`${toast.action.key}-${toast.nonce}`} action={toast.action} onDismiss={() => setToast(null)} />}
     </div>
   );

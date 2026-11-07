@@ -16,7 +16,7 @@ import { LineChart, StackedBars } from "./charts";
 import { computerOnline, dur, fmtMbps, isLive, num, rateOf, throughputSource, toMbps } from "./data";
 import { Big, Btn, C, Dot, HBar, KV, Label, Panel, Ring, Segmented } from "./ui";
 
-const HOST_COLORS = [C.cyan, C.pink, C.violet, C.green];
+const HOST_COLORS = () => [C.cyan, C.pink, C.violet, C.green];
 
 /* ------------------------------------------------------------- helpers */
 
@@ -99,7 +99,7 @@ function FleetRow({ c, index }: { c: CuratedComputer; index: number }) {
     <tr className="border-b border-dashed border-dx-line text-[12px] last:border-0 hover:bg-white/[0.015]">
       <td className="py-2.5 pl-1 pr-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md border" style={{ borderColor: `${HOST_COLORS[index % 4]}55`, color: HOST_COLORS[index % 4] }}>
+          <span className="flex h-7 w-7 items-center justify-center rounded-md border" style={{ borderColor: `${HOST_COLORS()[index % 4]}55`, color: HOST_COLORS()[index % 4] }}>
             <c.icon size={14} />
           </span>
           <div>
@@ -347,7 +347,7 @@ export function WorkstationPanel({ c, index }: { c: CuratedComputer; index: numb
   const cpuH = useEntityHistory(cpu?.entityId ?? "", 6, 72);
   const memH = useEntityHistory(mem?.entityId ?? "", 6, 72);
   const offlineSince = useOfflineSince(c, online);
-  const color = HOST_COLORS[index % 4];
+  const color = HOST_COLORS()[index % 4];
   const badges = c.badges?.filter((b) => entities[b.entityId]?.state === "on") ?? [];
 
   function fact(f: CuratedComputer["facts"][number]) {
@@ -404,11 +404,11 @@ export function WorkstationPanel({ c, index }: { c: CuratedComputer; index: numb
 
 /* -------------------------------------------------------------- Network */
 
-const BANDS: Record<string, { label: string; color: string }> = {
+const BANDS = (): Record<string, { label: string; color: string }> => ({
   ng: { label: "2.4 GHz", color: C.amber },
   na: { label: "5 GHz", color: C.cyan },
   "6e": { label: "6 GHz", color: C.violet },
-};
+});
 
 export function NetworkConsole({ delay = 0 }: { delay?: number }) {
   const { entities, entitiesWithArea } = useHa();
@@ -508,14 +508,14 @@ export function NetworkConsole({ delay = 0 }: { delay?: number }) {
           </div>
           <div className="flex h-2 overflow-hidden rounded-sm">
             {[...bands].map(([r, n]) => (
-              <span key={r} style={{ width: `${(n / Math.max(1, wireless)) * 100}%`, background: BANDS[r]?.color ?? C.faint }} title={`${BANDS[r]?.label ?? r}: ${n}`} />
+              <span key={r} style={{ width: `${(n / Math.max(1, wireless)) * 100}%`, background: BANDS()[r]?.color ?? C.faint }} title={`${BANDS()[r]?.label ?? r}: ${n}`} />
             ))}
           </div>
           <div className="flex flex-col gap-2">
             {[...bands]
               .sort((a, b) => b[1] - a[1])
               .map(([r, n]) => (
-                <HBar key={r} label={BANDS[r]?.label ?? r} value={n} max={wireless} display={n} color={BANDS[r]?.color ?? C.faint} />
+                <HBar key={r} label={BANDS()[r]?.label ?? r} value={n} max={wireless} display={n} color={BANDS()[r]?.color ?? C.faint} />
               ))}
           </div>
           {ssids.size > 0 && (
@@ -535,7 +535,7 @@ export function NetworkConsole({ delay = 0 }: { delay?: number }) {
 /* ---------------------------------------------------------- Screen time */
 
 type Kind = "kids" | "youtube";
-const YT = { kids: C.red, youtube: C.cyan };
+const YT = () => ({ kids: C.red, youtube: C.cyan });
 
 function kindOf(state: string, attributes: Record<string, unknown> | undefined): Kind | undefined {
   if (YOUTUBE.offStates.includes(state)) return undefined;
@@ -589,8 +589,8 @@ export function ScreenTimePanel({ delay = 0 }: { delay?: number }) {
       delay={delay}
       right={
         watching.length > 0 ? (
-          <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: YT[watching[0].k] }}>
-            <Dot color={YT[watching[0].k]} pulse /> Watching on {watching.map((w) => w.name).join(", ")}
+          <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: YT()[watching[0].k] }}>
+            <Dot color={YT()[watching[0].k]} pulse /> Watching on {watching.map((w) => w.name).join(", ")}
           </span>
         ) : (
           <span className="text-[10.5px] uppercase tracking-[0.12em] text-dx-faint">Not watching</span>
@@ -616,16 +616,16 @@ export function ScreenTimePanel({ delay = 0 }: { delay?: number }) {
             </div>
             <div className="flex gap-4 text-[11px] text-dx-dim">
               <span className="flex items-center gap-1.5">
-                <Dot color={YT.kids} /> Kids
+                <Dot color={YT().kids} /> Kids
               </span>
               <span className="flex items-center gap-1.5">
-                <Dot color={YT.youtube} /> YouTube
+                <Dot color={YT().youtube} /> YouTube
               </span>
             </div>
           </div>
           <StackedBars
             height={150}
-            colors={[YT.youtube, YT.kids]}
+            colors={[YT().youtube, YT().kids]}
             names={["YouTube", "Kids"]}
             format={(m) => (m >= 60 ? `${Math.floor(m / 60)}h${String(Math.round(m % 60)).padStart(2, "0")}` : `${Math.round(m)}m`)}
             bars={starts.map((s, i) => ({

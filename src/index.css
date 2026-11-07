@@ -32,6 +32,7 @@
   --color-dx-amber: #ffb020;
   --color-dx-green: #2ef2a3;
   --color-dx-red: #ff4d6d;
+  --color-dx-primary: #21e6f2;
   --font-dx: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }

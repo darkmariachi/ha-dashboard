@@ -1,0 +1,475 @@
+/*
+ * Desktop themes: everything here keys off data-dx-theme on the .dx root
+ * (colors come from the CSS variables themes.ts sets there). Hooks used by
+ * the components: .dx-fx (background layer), .dx-rail, .dx-topbar, .dx-logo,
+ * .dx-h1, .dx-panel / .dx-panel-head / .dx-tick / .dx-title, .dx-btn, .dx-seg,
+ * .dx-nav (rail links).
+ *
+ * These rules are unlayered, so they win over Tailwind's utilities.
+ */
+
+.dx {
+  --font-dx-title: var(--font-dx);
+  --dx-title-size: 10.5px;
+  --dx-title-track: 0.16em;
+}
+.dx .dx-num { font-family: var(--font-mono); }
+.dx .dx-title { font-family: var(--font-dx-title); font-size: var(--dx-title-size); letter-spacing: var(--dx-title-track); }
+.dx .dx-h1 { font-family: var(--font-dx-title); }
+.dx-fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.dx-fx > * { position: absolute; }
+.dx-rail { background: color-mix(in srgb, var(--color-dx-bg) 80%, transparent); }
+.dx-topbar { background: color-mix(in srgb, var(--color-dx-bg) 60%, transparent); }
+.dx-logo {
+  background: linear-gradient(135deg, var(--color-dx-cyan), var(--color-dx-pink));
+  box-shadow: 0 0 18px -4px var(--color-dx-pink);
+  color: #000;
+}
+
+/* ---------------------------------------------------------------- Neon */
+
+.dx[data-dx-theme="neon"] .dx-fx {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ----------------------------------------------- Netrunner (Cyberpunk) */
+
+.dx[data-dx-theme="netrunner"] {
+  --font-dx: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Rajdhani", ui-sans-serif, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+  --dx-title-size: 12px;
+  --dx-title-track: 0.22em;
+  font-weight: 500;
+  background:
+    radial-gradient(900px 500px at 0% 0%, rgba(255, 42, 109, 0.1), transparent 60%),
+    radial-gradient(800px 500px at 100% 100%, rgba(0, 240, 255, 0.06), transparent 60%),
+    var(--color-dx-bg);
+}
+.dx[data-dx-theme="netrunner"] .dx-fx {
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    linear-gradient(90deg, rgba(252, 238, 10, 0.035) 1px, transparent 1px) 0 0 / 120px 100%;
+}
+/* A slow band of brighter scanline sweeping down the screen. */
+.dx[data-dx-theme="netrunner"] .dx-fx::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: linear-gradient(180deg, transparent, rgba(0, 240, 255, 0.04), transparent);
+  animation: dx-sweep 9s linear infinite;
+}
+@keyframes dx-sweep {
+  from { top: -140px; }
+  to { top: 100%; }
+}
+.dx[data-dx-theme="netrunner"] .dx-panel {
+  border-radius: 0;
+  border-color: var(--color-dx-line);
+  background:
+    linear-gradient(135deg, rgba(252, 238, 10, 0.035), transparent 30%),
+    var(--color-dx-panel);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  position: relative;
+}
+/* The cut corners get their own edge lines. */
+.dx[data-dx-theme="netrunner"] .dx-panel::before,
+.dx[data-dx-theme="netrunner"] .dx-panel::after {
+  content: "";
+  position: absolute;
+  width: 23px;
+  height: 2px;
+  background: var(--color-dx-amber);
+  pointer-events: none;
+}
+.dx[data-dx-theme="netrunner"] .dx-panel::before { top: 7px; right: -4px; transform: rotate(45deg); }
+.dx[data-dx-theme="netrunner"] .dx-panel::after { bottom: 7px; left: -4px; transform: rotate(45deg); opacity: 0.5; }
+.dx[data-dx-theme="netrunner"] .dx-panel-head {
+  border-bottom: 1px dashed rgba(252, 238, 10, 0.18);
+  background: linear-gradient(90deg, rgba(252, 238, 10, 0.06), transparent 50%);
+}
+.dx[data-dx-theme="netrunner"] .dx-title { color: var(--color-dx-amber); font-weight: 700; }
+.dx[data-dx-theme="netrunner"] .dx-tick {
+  width: 7px !important;
+  height: 12px !important;
+  border-radius: 0 !important;
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 0 100%);
+}
+.dx[data-dx-theme="netrunner"] .dx-rail { border-right: 1px solid rgba(252, 238, 10, 0.25); background: rgba(7, 8, 11, 0.9); }
+.dx[data-dx-theme="netrunner"] .dx-nav { border-radius: 0; }
+.dx[data-dx-theme="netrunner"] .dx-nav.active { clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%); }
+.dx[data-dx-theme="netrunner"] .dx-topbar {
+  border-bottom: 1px solid rgba(252, 238, 10, 0.35);
+  background: rgba(7, 8, 11, 0.85);
+}
+/* Hazard tape under the top bar. */
+.dx[data-dx-theme="netrunner"] .dx-topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -5px;
+  width: 220px;
+  height: 4px;
+  background: repeating-linear-gradient(-45deg, var(--color-dx-amber) 0 6px, transparent 6px 12px);
+}
+.dx[data-dx-theme="netrunner"] .dx-logo {
+  background: var(--color-dx-amber);
+  box-shadow: 0 0 20px -4px var(--color-dx-amber);
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 72% 100%, 0 100%);
+  font-family: "Share Tech Mono", monospace;
+}
+.dx[data-dx-theme="netrunner"] .dx-h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--color-dx-amber);
+  text-shadow: 2px 0 rgba(255, 42, 109, 0.7), -2px 0 rgba(0, 240, 255, 0.5);
+  animation: dx-glitch 7s steps(1) infinite;
+}
+@keyframes dx-glitch {
+  0%, 93%, 100% { transform: none; clip-path: none; }
+  94% { transform: translateX(-3px); clip-path: inset(10% 0 55% 0); }
+  95% { transform: translateX(3px); clip-path: inset(55% 0 10% 0); }
+  96% { transform: translateX(-1px); clip-path: inset(30% 0 30% 0); }
+}
+.dx[data-dx-theme="netrunner"] .dx-btn,
+.dx[data-dx-theme="netrunner"] .dx-seg,
+.dx[data-dx-theme="netrunner"] .dx-seg > button {
+  border-radius: 0;
+}
+.dx[data-dx-theme="netrunner"] .dx-btn { clip-path: polygon(0 0, 100% 0, 100% 65%, calc(100% - 7px) 100%, 0 100%); }
+.dx[data-dx-theme="netrunner"] .dx-btn,
+.dx[data-dx-theme="netrunner"] .dx-seg > button { font-size: 12px; letter-spacing: 0.14em; }
+.dx[data-dx-theme="netrunner"] :is(.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl) { border-radius: 0; }
+
+/* -------------------------------------------- Ocean Drive (Vice City) */
+
+.dx[data-dx-theme="vice"] {
+  --font-dx: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Righteous", ui-sans-serif, sans-serif;
+  --dx-title-size: 12px;
+  --dx-title-track: 0.12em;
+  background: linear-gradient(180deg, #0d0620 0%, #2a0b45 38%, #6a1257 62%, #c2365b 80%, #f7854a 100%);
+}
+/* The sun: a striped disc low in the sky. */
+.dx[data-dx-theme="vice"] .dx-fx::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  width: 520px;
+  height: 520px;
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffd56b 0%, #ff8a4c 45%, #ff3f9f 100%);
+  -webkit-mask: repeating-linear-gradient(180deg, #000 0 22px, transparent 22px 30px);
+  mask: repeating-linear-gradient(180deg, #000 0 22px, transparent 22px 30px);
+  opacity: 0.55;
+  filter: drop-shadow(0 0 60px rgba(255, 63, 159, 0.6));
+}
+/* The synthwave floor, scrolling toward you. */
+.dx[data-dx-theme="vice"] .dx-fx::after {
+  content: "";
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: -10%;
+  height: 42%;
+  background:
+    linear-gradient(rgba(255, 63, 159, 0.55) 2px, transparent 2px) 0 0 / 100% 48px,
+    linear-gradient(90deg, rgba(45, 226, 230, 0.4) 2px, transparent 2px) 0 0 / 64px 100%,
+    linear-gradient(180deg, #1a0630, #0d0418);
+  transform: perspective(380px) rotateX(62deg);
+  transform-origin: top;
+  animation: dx-floor 3s linear infinite;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 35%);
+  mask: linear-gradient(180deg, transparent, #000 35%);
+}
+@keyframes dx-floor {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to { background-position: 0 48px, 0 0, 0 0; }
+}
+.dx[data-dx-theme="vice"] .dx-panel {
+  border-radius: 16px;
+  border-color: rgba(255, 120, 200, 0.22);
+  background: linear-gradient(160deg, rgba(255, 63, 159, 0.07), transparent 40%), var(--color-dx-panel);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 0 30px -14px rgba(255, 63, 159, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.dx[data-dx-theme="vice"] .dx-panel-head { border-bottom-color: rgba(255, 120, 200, 0.14); }
+.dx[data-dx-theme="vice"] .dx-title {
+  background: linear-gradient(90deg, #ff6fb5, #ffb36b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 400;
+}
+.dx[data-dx-theme="vice"] .dx-tick {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(180deg, #ffd56b, #ff3f9f) !important;
+}
+.dx[data-dx-theme="vice"] .dx-rail { background: rgba(20, 8, 38, 0.6); backdrop-filter: blur(12px); border-right-color: rgba(255, 120, 200, 0.18); }
+.dx[data-dx-theme="vice"] .dx-topbar { background: rgba(20, 8, 38, 0.45); border-bottom-color: rgba(255, 120, 200, 0.18); }
+.dx[data-dx-theme="vice"] .dx-nav { border-radius: 999px; }
+.dx[data-dx-theme="vice"] .dx-logo {
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffd56b, #ff3f9f 60%, #9b6dff);
+  box-shadow: 0 0 24px -2px rgba(255, 63, 159, 0.8);
+  font-family: "Pacifico", cursive;
+  font-weight: 400;
+  color: #fff;
+  font-size: 18px;
+}
+.dx[data-dx-theme="vice"] .dx-h1 {
+  font-family: "Pacifico", cursive;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 26px;
+  font-weight: 400;
+  color: #ff6fb5;
+  text-shadow: 0 0 6px rgba(255, 63, 159, 0.9), 0 0 22px rgba(255, 63, 159, 0.6), 2px 2px 0 #2de2e6;
+  overflow: visible;
+  line-height: 1.25;
+}
+.dx[data-dx-theme="vice"] .dx-btn { border-radius: 999px; padding-left: 12px; padding-right: 12px; }
+.dx[data-dx-theme="vice"] .dx-seg { border-radius: 999px; }
+.dx[data-dx-theme="vice"] .dx-seg > button { border-radius: 999px; }
+
+/* ----------------------------------------------- Tactical (Valorant) */
+
+.dx[data-dx-theme="tactical"] {
+  --font-dx: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Bebas Neue", "Barlow Condensed", sans-serif;
+  --font-mono: "Barlow Condensed", ui-sans-serif, sans-serif;
+  --dx-title-size: 17px;
+  --dx-title-track: 0.08em;
+  background:
+    linear-gradient(115deg, transparent 58%, rgba(255, 70, 85, 0.07) 58%, rgba(255, 70, 85, 0.07) 66%, transparent 66%),
+    linear-gradient(115deg, transparent 69%, rgba(236, 232, 225, 0.03) 69%, rgba(236, 232, 225, 0.03) 71%, transparent 71%),
+    var(--color-dx-bg);
+}
+.dx[data-dx-theme="tactical"] .dx-num { letter-spacing: 0.01em; font-weight: 500; }
+.dx[data-dx-theme="tactical"] .dx-fx {
+  background-image: radial-gradient(rgba(236, 232, 225, 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.dx[data-dx-theme="tactical"] .dx-panel {
+  border-radius: 0;
+  background: var(--color-dx-panel);
+  border-color: rgba(236, 232, 225, 0.1);
+  position: relative;
+}
+/* Red corner notch, top-left; a thin off-white tab, top-right. */
+.dx[data-dx-theme="tactical"] .dx-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-dx-red);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  pointer-events: none;
+}
+.dx[data-dx-theme="tactical"] .dx-panel::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: 14px;
+  width: 36px;
+  height: 2px;
+  background: var(--color-dx-text);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.dx[data-dx-theme="tactical"] .dx-panel-head { height: 44px; border-bottom-color: rgba(236, 232, 225, 0.08); }
+.dx[data-dx-theme="tactical"] .dx-title { color: var(--color-dx-text); font-weight: 400; padding-top: 2px; }
+.dx[data-dx-theme="tactical"] .dx-tick {
+  width: 4px !important;
+  height: 16px !important;
+  border-radius: 0 !important;
+  transform: skewX(-18deg);
+  box-shadow: none !important;
+}
+.dx[data-dx-theme="tactical"] .dx-rail { background: #0b131b; border-right-color: rgba(236, 232, 225, 0.08); }
+.dx[data-dx-theme="tactical"] .dx-topbar { background: rgba(15, 25, 35, 0.92); border-bottom: 1px solid rgba(236, 232, 225, 0.1); }
+.dx[data-dx-theme="tactical"] .dx-nav { border-radius: 0; }
+.dx[data-dx-theme="tactical"] .dx-nav.active { background: var(--color-dx-red); color: var(--color-dx-text); }
+.dx[data-dx-theme="tactical"] .dx-logo {
+  border-radius: 0;
+  background: var(--color-dx-red);
+  box-shadow: none;
+  color: var(--color-dx-text);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 22% 100%, 0 78%);
+}
+.dx[data-dx-theme="tactical"] .dx-h1 {
+  font-size: 34px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding-top: 3px;
+}
+.dx[data-dx-theme="tactical"] .dx-btn {
+  border-radius: 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  outline: 1px solid rgba(236, 232, 225, 0.12);
+  outline-offset: 2px;
+}
+.dx[data-dx-theme="tactical"] .dx-btn:hover:not(:disabled) { background: var(--color-dx-red) !important; color: var(--color-dx-text) !important; border-color: var(--color-dx-red) !important; }
+.dx[data-dx-theme="tactical"] .dx-seg,
+.dx[data-dx-theme="tactical"] .dx-seg > button { border-radius: 0; }
+.dx[data-dx-theme="tactical"] .dx-seg > button { font-family: "Barlow Condensed", sans-serif; font-size: 12.5px; }
+.dx[data-dx-theme="tactical"] :is(.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl) { border-radius: 0; }
+
+/* -------------------------------------- Hextech (League of Legends) */
+
+.dx[data-dx-theme="hextech"] {
+  --font-dx: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Cinzel Variable", Georgia, serif;
+  --dx-title-size: 12px;
+  --dx-title-track: 0.12em;
+  --gold: linear-gradient(180deg, #f0e6d2 0%, #c8aa6e 40%, #785a28 100%);
+  background:
+    radial-gradient(1000px 520px at 50% -12%, rgba(3, 151, 171, 0.2), transparent 65%),
+    radial-gradient(700px 400px at 100% 110%, rgba(200, 170, 110, 0.08), transparent 60%),
+    var(--color-dx-bg);
+}
+/* Faint hexagon lattice. */
+.dx[data-dx-theme="hextech"] .dx-fx {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0l28 16v32L28 64 0 48V16zM28 64v33M0 16L-28 0M56 16l28-16' fill='none' stroke='%23c8aa6e' stroke-opacity='0.06'/%3E%3C/svg%3E");
+  -webkit-mask: radial-gradient(1200px 800px at 50% 0%, #000, transparent 85%);
+  mask: radial-gradient(1200px 800px at 50% 0%, #000, transparent 85%);
+}
+.dx[data-dx-theme="hextech"] .dx-panel {
+  border-radius: 0;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, #0a1a30, #071121) padding-box,
+    linear-gradient(180deg, #c8aa6e, #463714 60%, #785a28) border-box;
+  position: relative;
+  box-shadow: 0 8px 26px -14px rgba(0, 0, 0, 0.9);
+}
+/* Inner hairline frame. */
+.dx[data-dx-theme="hextech"] .dx-panel::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(200, 170, 110, 0.12);
+  pointer-events: none;
+}
+.dx[data-dx-theme="hextech"] .dx-panel-head {
+  position: relative;
+  border-bottom: 1px solid rgba(200, 170, 110, 0.18);
+  background: linear-gradient(180deg, rgba(200, 170, 110, 0.06), transparent);
+}
+/* A small gold diamond centred on the header rule. */
+.dx[data-dx-theme="hextech"] .dx-panel-head::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 7px;
+  height: 7px;
+  background: #c8aa6e;
+  transform: translateX(-50%) rotate(45deg);
+  box-shadow: 0 0 6px rgba(200, 170, 110, 0.6);
+}
+.dx[data-dx-theme="hextech"] .dx-title {
+  background: var(--gold);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.dx[data-dx-theme="hextech"] .dx-tick {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 0 !important;
+  transform: rotate(45deg);
+  background: #0ac8b9 !important;
+  box-shadow: 0 0 8px #0ac8b9 !important;
+  border: 1px solid #c8aa6e;
+}
+.dx[data-dx-theme="hextech"] .dx-rail {
+  background: linear-gradient(180deg, #010a13, #091428);
+  border-right: 1px solid transparent;
+  border-image: linear-gradient(180deg, #785a28, #c8aa6e, #785a28) 1;
+}
+.dx[data-dx-theme="hextech"] .dx-topbar {
+  background: linear-gradient(180deg, rgba(1, 10, 19, 0.95), rgba(9, 20, 40, 0.85));
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, #785a28 10%, #c8aa6e 50%, #785a28 90%, transparent) 1;
+}
+.dx[data-dx-theme="hextech"] .dx-nav { border-radius: 0; }
+.dx[data-dx-theme="hextech"] .dx-nav.active {
+  background: radial-gradient(circle, rgba(10, 200, 185, 0.18), transparent 70%);
+  color: #f0e6d2;
+  box-shadow: inset 0 0 0 1px rgba(200, 170, 110, 0.6);
+}
+.dx[data-dx-theme="hextech"] .dx-logo {
+  border-radius: 0;
+  background: radial-gradient(circle at 50% 40%, #0ac8b9, #005a82 70%);
+  box-shadow: 0 0 0 1px #c8aa6e, 0 0 18px -2px rgba(10, 200, 185, 0.7);
+  color: #f0e6d2;
+  transform: rotate(45deg) scale(0.78);
+  font-size: 0;
+}
+.dx[data-dx-theme="hextech"] .dx-logo::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: #f0e6d2;
+  box-shadow: 0 0 10px #fff;
+}
+.dx[data-dx-theme="hextech"] .dx-h1 {
+  background: var(--gold);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.dx[data-dx-theme="hextech"] .dx-btn {
+  border-radius: 0;
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(180deg, #1e2328, #0a1428) padding-box,
+    linear-gradient(180deg, #c8aa6e, #785a28) border-box !important;
+  color: #cdbe91 !important;
+  font-weight: 700;
+}
+.dx[data-dx-theme="hextech"] .dx-btn:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, #2a3038, #0e1d33) padding-box,
+    linear-gradient(180deg, #f0e6d2, #c8aa6e) border-box !important;
+  color: #f0e6d2 !important;
+  box-shadow: 0 0 12px -2px rgba(200, 170, 110, 0.6);
+}
+.dx[data-dx-theme="hextech"] .dx-seg,
+.dx[data-dx-theme="hextech"] .dx-seg > button { border-radius: 0; }
+.dx[data-dx-theme="hextech"] .dx-seg { border-color: rgba(200, 170, 110, 0.35); }
+.dx[data-dx-theme="hextech"] :is(.rounded, .rounded-sm, .rounded-md, .rounded-lg) { border-radius: 2px; }
+
+/* Theme picker cards. */
+.dx-theme-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.dx-theme-card:hover { transform: translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dx-fx::after, .dx .dx-h1 { animation: none !important; }
+}

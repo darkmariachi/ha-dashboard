@@ -31,7 +31,7 @@ const DAY = 86_400_000;
 const WINDOW_DAYS = 30;
 const NEW_DEVICE_DAYS = 30;
 const RESIDENT_DAYS = 2;
-const PALETTE = [C.cyan, C.pink, C.violet, C.green, C.amber];
+const PALETTE = () => [C.cyan, C.pink, C.violet, C.green, C.amber];
 
 const day = (t: number) => new Date(t).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 const hhmm = (t: number) => new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -546,7 +546,7 @@ export function VisitorsConsole() {
   const people = useMemo(() => {
     if (!log) return [];
     return log.people
-      .map((p, i) => ({ person: p, visits: allVisits(p, log, seen), here: p.devices.some(isHere), color: PALETTE[i % PALETTE.length] }))
+      .map((p, i) => ({ person: p, visits: allVisits(p, log, seen), here: p.devices.some(isHere), color: PALETTE()[i % 5] }))
       .sort((a, b) => Number(b.here) - Number(a.here) || (b.visits[0]?.start ?? 0) - (a.visits[0]?.start ?? 0));
   }, [log, isHere, seen]);
 
@@ -858,7 +858,7 @@ function HouseholdPanel() {
           return (
             <button key={n} onClick={() => setOpen(n)} className="flex items-center gap-2 rounded-md p-1.5 text-left hover:bg-white/[0.04]">
               {s?.sample ? (
-                <img src={s.sample} alt="" className="h-8 w-8 rounded-[5px] object-cover" style={{ boxShadow: `0 0 0 1px ${PALETTE[i % PALETTE.length]}88` }} />
+                <img src={s.sample} alt="" className="h-8 w-8 rounded-[5px] object-cover" style={{ boxShadow: `0 0 0 1px ${PALETTE()[i % 5]}88` }} />
               ) : (
                 <span className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-dx-raise text-[12px] font-semibold text-dx-dim">{n.charAt(0)}</span>
               )}

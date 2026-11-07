@@ -13,13 +13,15 @@ export const C = {
   dim: "#7f84a0",
   faint: "#484c66",
   text: "#e9ebf7",
+  /** The current theme's chrome color (themes.ts re-points all of these). */
+  primary: "#21e6f2",
 };
 
 /** A titled console panel. `accent` colors the little tick before the title. */
 export function Panel({
   title,
   icon: Icon,
-  accent = C.cyan,
+  accent,
   right,
   className,
   bodyClassName,
@@ -41,10 +43,10 @@ export function Panel({
       className={clsx("dx-panel dx-in flex min-w-0 flex-col", className)}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b border-dx-line px-4">
-        <span className="h-3 w-[3px] rounded-full" style={{ background: accent, boxShadow: `0 0 8px ${accent}` }} />
+      <header className="dx-panel-head flex h-10 shrink-0 items-center gap-2 border-b border-dx-line px-4">
+        <span className="dx-tick h-3 w-[3px] shrink-0 rounded-full" style={{ background: accent ?? C.primary, boxShadow: `0 0 8px ${accent ?? C.primary}` }} />
         {Icon && <Icon size={14} className="text-dx-dim" />}
-        <h2 className="flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.16em] text-dx-dim">{title}</h2>
+        <h2 className="dx-title flex-1 truncate font-semibold uppercase text-dx-dim">{title}</h2>
         {right}
       </header>
       <div className={clsx("min-h-0 flex-1 p-4", bodyClassName)}>{children}</div>
@@ -125,14 +127,16 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-md border border-dx-line bg-white/[0.02] p-0.5">
+    <div className="dx-seg flex rounded-md border border-dx-line bg-white/[0.02] p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           className={clsx(
             "flex flex-1 items-center justify-center gap-1 rounded-[5px] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors",
-            o.value === value ? "bg-dx-cyan/15 text-dx-cyan shadow-[inset_0_0_0_1px_rgba(33,230,242,0.4)]" : "text-dx-dim hover:text-dx-text",
+            o.value === value
+              ? "bg-dx-primary/15 text-dx-primary shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-dx-primary)_40%,transparent)]"
+              : "text-dx-dim hover:text-dx-text",
           )}
         >
           {o.label}
@@ -164,7 +168,7 @@ export function Btn({
       disabled={disabled}
       title={title}
       className={clsx(
-        "inline-flex items-center justify-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:opacity-35",
+        "dx-btn inline-flex items-center justify-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:opacity-35",
         !color && "border-dx-line text-dx-dim hover:border-white/20 hover:text-dx-text",
         className,
       )}

@@ -36,7 +36,7 @@ import { LineChart } from "./charts";
 import { dur, num } from "./data";
 import { Big, Btn, C, Dot, KV, Label, Panel, Ring, Segmented, Switch } from "./ui";
 
-const ROOM_NEON = [C.cyan, C.pink, C.violet, C.green, C.amber, C.pink, C.green, C.cyan];
+const ROOM_NEON = () => [C.cyan, C.pink, C.violet, C.green, C.amber, C.pink, C.green, C.cyan];
 
 function useToggle() {
   const { callService } = useHa();
@@ -110,7 +110,7 @@ export function RoomsMatrix({ delay = 0, className }: { delay?: number; classNam
     <Panel title="Rooms" icon={LayoutGrid} accent={C.cyan} delay={delay} className={className} right={<span className="dx-num text-[10.5px] text-dx-faint">{total} on</span>}>
       <div className="flex flex-col">
         {CURATED_ROOMS.map((room, i) => {
-          const color = ROOM_NEON[i % ROOM_NEON.length];
+          const color = ROOM_NEON()[i % 8];
           const on = room.toggles.filter((t) => entities[t.entityId]?.state === "on").length;
           return (
             <div key={room.key} className="grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3 border-b border-dashed border-dx-line py-2 last:border-0">
@@ -158,7 +158,7 @@ export function RoomPanel({ room, index }: { room: CuratedRoom; index: number })
   const toggle = useToggle();
   const nowMs = useNow(30_000).getTime();
   const [sheet, setSheet] = useState(false);
-  const color = ROOM_NEON[index % ROOM_NEON.length];
+  const color = ROOM_NEON()[index % 8];
   const on = room.toggles.filter((t) => entities[t.entityId]?.state === "on").length;
   const hue = room.lights ? entities[room.lights] : undefined;
 
