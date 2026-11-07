@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, Trash2, Wifi, X } from "lucide-react";
+import { Check, EyeOff, ImagePlus, ListChecks, Loader2, ScanFace, Sparkles, Star, StarOff, Trash2, Wifi, X } from "lucide-react";
 import { DeleteFaceSheet, FaceViewer } from "../visitors/FaceViewer";
 import { Sheet } from "../home/Sheet";
 import {
@@ -45,11 +45,14 @@ function WhoPicker({
   busy,
   onPick,
   onIgnore,
+  onValue,
 }: {
   log: VisitLog;
   suggestion?: string;
   busy?: boolean;
   onPick: (subject: string) => void;
+  /** Called with whatever is selected (for bulk saving). */
+  onValue?: (value: string) => void;
   /** Shows a quick Ignore button beside Save. */
   onIgnore?: () => void;
 }) {
@@ -67,6 +70,9 @@ function WhoPicker({
   ]);
   const [name, setName] = useState("");
   const naming = value === NEW_VISITOR || value === NEW_HOUSEHOLD;
+  useEffect(() => {
+    onValue?.(value);
+  }, [value, onValue]);
 
   async function apply() {
     if (value === NEW_VISITOR) {
@@ -132,8 +138,34 @@ function WhoPicker({
 
 /* ---------------------------------------------------------- review panel */
 
-function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log: VisitLog; now: number; onDone: () => void }) {
+/** What a review card would save: who, and which of its faces. */
+interface Choice {
+  subject: string;
+  ids: number[];
+  /** Pre-filled from a suggestion (not picked by hand). */
+  suggested: boolean;
+}
+
+function ClusterCard({
+  cluster,
+  log,
+  now,
+  onDone,
+  selected,
+  onSelect,
+  onChoice,
+}: {
+  cluster: FaceCluster;
+  log: VisitLog;
+  now: number;
+  onDone: () => void;
+  selected: boolean;
+  onSelect: (key: number, on: boolean) => void;
+  onChoice: (key: number, choice: Choice | null) => void;
+}) {
+  const key = cluster.ids[0];
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
+  const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmIgnore, setConfirmIgnore] = useState(false);
@@ -144,6 +176,16 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const first = cluster.times[0];
   const last = cluster.times.at(-1)!;
   const days = new Set(cluster.times.map((t) => new Date(t).toDateString())).size;
+  const suggestion = hint?.id ?? looks?.subject;
+  const usable = !!value && value !== NEW_VISITOR && value !== NEW_HOUSEHOLD;
+
+  useEffect(() => {
+    onChoice(
+      key,
+      usable ? { subject: value, ids: cluster.ids.filter((id) => !excluded.has(id)), suggested: value === suggestion && value !== IGNORE } : null,
+    );
+  }, [key, usable, value, suggestion, excluded, cluster.ids, onChoice]);
+  useEffect(() => () => onChoice(key, null), [key, onChoice]);
 
   async function pick(subject: string) {
     setBusy(true);
@@ -162,7 +204,12 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-dx-line bg-white/[0.015] p-2.5">
+    <div
+      className={clsx(
+        "flex flex-col gap-2 rounded-md border bg-white/[0.015] p-2.5 transition-colors",
+        selected && usable ? "border-dx-primary/70 bg-dx-primary/[0.06]" : "border-dx-line",
+      )}
+    >
       <div className="grid grid-cols-4 gap-1">
         {cluster.faces.map((f) => {
           const out = excluded.has(f.id);
@@ -227,6 +274,15 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
         />
       )}
       <div className="dx-num flex flex-wrap items-center gap-x-2 text-[10.5px] text-dx-dim">
+        <input
+          type="checkbox"
+          checked={selected && usable}
+          disabled={!usable}
+          onChange={(e) => onSelect(key, e.target.checked)}
+          title={usable ? "Include in “Save selected”" : "Pick who this is first"}
+          aria-label="Select this group"
+          className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-dx-primary)] disabled:cursor-not-allowed disabled:opacity-30"
+        />
         <span className="text-dx-text">{cluster.ids.length}×</span>
         <span>{days} {days === 1 ? "day" : "days"}</span>
         <span className="text-dx-faint">
@@ -245,7 +301,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
           <Sparkles size={11} /> Looks like {subjectName(looks.subject, log)} · {Math.round(looks.score * 100)}%
         </div>
       )}
-      <WhoPicker log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} onIgnore={() => setConfirmIgnore(true)} />
+      <WhoPicker log={log} suggestion={suggestion} busy={busy} onPick={pick} onIgnore={() => setConfirmIgnore(true)} onValue={setValue} />
       {confirmIgnore && (
         <Sheet
           title={`Ignore ${cluster.ids.length - excluded.size === 1 ? "this face" : `these ${cluster.ids.length - excluded.size} faces`}?`}
@@ -282,6 +338,30 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
   const [status, setStatus] = useState<FaceStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [limit, setLimit] = useState(24);
+  const [choices, setChoices] = useState<Map<number, Choice>>(new Map());
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulk, setBulk] = useState<{ done: number; total: number; failed: number } | null>(null);
+
+  const onChoice = useCallback((key: number, choice: Choice | null) => {
+    setChoices((m) => {
+      const cur = m.get(key);
+      if (!choice && !cur) return m;
+      if (choice && cur && cur.subject === choice.subject && cur.suggested === choice.suggested && cur.ids.join() === choice.ids.join()) return m;
+      const n = new Map(m);
+      if (choice) n.set(key, choice);
+      else n.delete(key);
+      return n;
+    });
+  }, []);
+  const onSelect = useCallback((key: number, on: boolean) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (on) n.add(key);
+      else n.delete(key);
+      return n;
+    });
+  }, []);
 
   const load = useCallback(() => {
     faceStatus().then(setStatus).catch((e: Error) => setError(e.message));
@@ -305,6 +385,37 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
   const total = pending + done + (q.failed ?? 0);
   const unknown = status?.faces.unknown ?? 0;
   const shown = (clusters ?? []).filter((c) => c.ids.length > 0);
+  const suggestedKeys = shown.map((c) => c.ids[0]).filter((k) => choices.get(k)?.suggested);
+  const picked = shown.map((c) => c.ids[0]).filter((k) => selected.has(k) && choices.has(k));
+  const allSuggestedOn = suggestedKeys.length > 0 && suggestedKeys.every((k) => selected.has(k));
+  const bySubject = new Map<string, { groups: number; faces: number }>();
+  for (const k of picked) {
+    const c = choices.get(k)!;
+    const e = bySubject.get(c.subject) ?? { groups: 0, faces: 0 };
+    e.groups += 1;
+    e.faces += c.ids.length;
+    bySubject.set(c.subject, e);
+  }
+
+  async function saveSelected() {
+    setConfirmBulk(false);
+    const jobs = picked.map((k) => choices.get(k)!).filter((c) => c.ids.length > 0);
+    setBulk({ done: 0, total: jobs.length, failed: 0 });
+    let failed = 0;
+    for (const [i, c] of jobs.entries()) {
+      try {
+        await assignFaces(c.ids, c.subject);
+      } catch {
+        failed += 1;
+      }
+      setBulk({ done: i + 1, total: jobs.length, failed });
+    }
+    avatarsChanged();
+    setSelected(new Set());
+    onChanged();
+    load();
+    setTimeout(() => setBulk(null), failed ? 8000 : 3000);
+  }
 
   return (
     <Panel
@@ -342,6 +453,71 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
             Faces from person detections at the front door and driveway, grouped by likeness. Name a group once and future sightings are matched
             automatically. Click a face to leave it out of the group.
           </p>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-dx-line bg-white/[0.02] px-3 py-2 text-[11.5px]">
+            <span className="text-dx-dim">
+              <span className="dx-num text-dx-text">{suggestedKeys.length}</span> of {shown.length} groups have a suggested name
+              {picked.length > 0 && (
+                <>
+                  {" · "}
+                  <span className="dx-num text-dx-text">{picked.length}</span> selected
+                </>
+              )}
+            </span>
+            <div className="ml-auto flex items-center gap-1.5">
+              {bulk && (
+                <span className="dx-num flex items-center gap-1.5 text-dx-dim">
+                  {bulk.done < bulk.total ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} className="text-dx-green" />}
+                  saved {bulk.done}/{bulk.total}
+                  {bulk.failed > 0 && <span className="text-dx-red">· {bulk.failed} failed</span>}
+                </span>
+              )}
+              <Btn
+                disabled={suggestedKeys.length === 0 || !!bulk}
+                onClick={() =>
+                  setSelected((s) => {
+                    const n = new Set(s);
+                    for (const k of suggestedKeys) {
+                      if (allSuggestedOn) n.delete(k);
+                      else n.add(k);
+                    }
+                    return n;
+                  })
+                }
+              >
+                <ListChecks size={11} /> {allSuggestedOn ? "Unselect suggested" : "Select suggested"}
+              </Btn>
+              {picked.length > 0 && !bulk && <Btn onClick={() => setSelected(new Set())}>Clear</Btn>}
+              <Btn color={C.green} disabled={picked.length === 0 || !!bulk} onClick={() => setConfirmBulk(true)}>
+                <Check size={11} /> Save selected{picked.length > 0 && ` (${picked.length})`}
+              </Btn>
+            </div>
+          </div>
+          {confirmBulk && (
+            <Sheet
+              title={`Save ${picked.length} ${picked.length === 1 ? "group" : "groups"}?`}
+              subtitle="Each group is saved as the name picked on its card."
+              onClose={() => setConfirmBulk(false)}
+            >
+              <div className="flex flex-col gap-1">
+                {[...bySubject.entries()]
+                  .sort((a, b) => b[1].faces - a[1].faces)
+                  .map(([subject, e]) => (
+                    <div key={subject} className="flex items-center justify-between rounded-lg bg-chip px-3 py-2 text-[13px] text-text">
+                      <span>{subject === IGNORE ? "Ignore" : subjectName(subject, log)}</span>
+                      <span className="text-text-dim">
+                        {e.groups} {e.groups === 1 ? "group" : "groups"} · {e.faces} {e.faces === 1 ? "face" : "faces"}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+              <div className="flex justify-end gap-2 pb-1">
+                <Btn onClick={() => setConfirmBulk(false)}>Cancel</Btn>
+                <Btn color={C.green} onClick={saveSelected}>
+                  <Check size={11} /> Save all
+                </Btn>
+              </div>
+            </Sheet>
+          )}
           <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
             {shown.map((c) => (
               <ClusterCard
@@ -349,6 +525,9 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
                 cluster={c}
                 log={log}
                 now={now}
+                selected={selected.has(c.ids[0])}
+                onSelect={onSelect}
+                onChoice={onChoice}
                 onDone={() => {
                   onChanged();
                   load();
