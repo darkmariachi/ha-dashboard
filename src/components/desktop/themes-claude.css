@@ -28,7 +28,7 @@
   position: absolute;
   inset: 0;
   background: url("./doodles.svg") center / cover no-repeat;
-  opacity: 0.5;
+  opacity: 0.75;
 }
 
 /* No neon: glows and drop shadows off (the theme picker keeps its ring). */
@@ -37,11 +37,23 @@
 .dx[data-dx-theme="claude"] [style*="drop-shadow"] { filter: none !important; }
 
 .dx[data-dx-theme="claude"] .dx-panel {
+  --doodle-at: 100% 100%;
   border-radius: 16px;
-  background: var(--color-dx-panel);
+  /* A faded corner of the doodle sheet behind every panel; each sibling
+     shows a different patch of it. */
+  background:
+    linear-gradient(rgba(251, 249, 244, 0.8), rgba(251, 249, 244, 0.8)),
+    url("./doodles.svg") var(--doodle-at) / 1100px auto no-repeat,
+    var(--color-dx-panel);
   border: 1px solid rgba(31, 30, 29, 0.1);
   box-shadow: 0 1px 2px rgba(60, 40, 20, 0.05), 0 8px 24px -14px rgba(60, 40, 20, 0.25);
 }
+.dx[data-dx-theme="claude"] :nth-child(4n + 1) > .dx-panel,
+.dx[data-dx-theme="claude"] .dx-panel:nth-child(4n + 1) { --doodle-at: 0% 100%; }
+.dx[data-dx-theme="claude"] :nth-child(4n + 2) > .dx-panel,
+.dx[data-dx-theme="claude"] .dx-panel:nth-child(4n + 2) { --doodle-at: 100% 0%; }
+.dx[data-dx-theme="claude"] :nth-child(4n + 3) > .dx-panel,
+.dx[data-dx-theme="claude"] .dx-panel:nth-child(4n + 3) { --doodle-at: 60% 100%; }
 .dx[data-dx-theme="claude"] .dx-panel-head { border-bottom-color: rgba(31, 30, 29, 0.07); }
 .dx[data-dx-theme="claude"] .dx-title {
   text-transform: none;
