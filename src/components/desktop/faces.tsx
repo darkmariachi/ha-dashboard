@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, Wifi, X } from "lucide-react";
+import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, Wifi, X } from "lucide-react";
+import { Sheet } from "../home/Sheet";
 import {
   HOUSEHOLD,
   IGNORE,
@@ -41,11 +42,14 @@ function WhoPicker({
   suggestion,
   busy,
   onPick,
+  onIgnore,
 }: {
   log: VisitLog;
   suggestion?: string;
   busy?: boolean;
   onPick: (subject: string) => void;
+  /** Shows a quick Ignore button beside Save. */
+  onIgnore?: () => void;
 }) {
   const household = useHouseholdNames();
   const [value, setValue] = useState(suggestion ?? "");
@@ -115,6 +119,11 @@ function WhoPicker({
       <Btn color={C.cyan} disabled={busy || !value || (naming && !name.trim())} onClick={apply}>
         {busy ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
       </Btn>
+      {onIgnore && (
+        <Btn onClick={onIgnore} disabled={busy} title="Hide this group from review">
+          <EyeOff size={11} /> Ignore
+        </Btn>
+      )}
     </div>
   );
 }
@@ -125,6 +134,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmIgnore, setConfirmIgnore] = useState(false);
   const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
   const looks = cluster.nearest && cluster.nearest.subject !== hint?.id ? cluster.nearest : null;
   const first = cluster.times[0];
@@ -191,7 +201,31 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
           <Sparkles size={11} /> Looks like {subjectName(looks.subject, log)} · {Math.round(looks.score * 100)}%
         </div>
       )}
-      <WhoPicker log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} />
+      <WhoPicker log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} onIgnore={() => setConfirmIgnore(true)} />
+      {confirmIgnore && (
+        <Sheet
+          title={`Ignore ${cluster.ids.length - excluded.size === 1 ? "this face" : `these ${cluster.ids.length - excluded.size} faces`}?`}
+          subtitle="They'll leave the review and won't be matched to anyone."
+          onClose={() => setConfirmIgnore(false)}
+        >
+          <p className="text-[13px] text-text-dim">
+            For strangers, delivery drivers and bad captures. Faces that closely resemble these will be hidden automatically too, so it's best not to use
+            it for someone you might want to name later.
+          </p>
+          <div className="flex justify-end gap-2 pb-1">
+            <Btn onClick={() => setConfirmIgnore(false)}>Cancel</Btn>
+            <Btn
+              color={C.red}
+              onClick={() => {
+                setConfirmIgnore(false);
+                pick(IGNORE);
+              }}
+            >
+              <EyeOff size={11} /> Ignore
+            </Btn>
+          </div>
+        </Sheet>
+      )}
       {error && <div className="text-[10.5px] text-dx-red">{error}</div>}
     </div>
   );

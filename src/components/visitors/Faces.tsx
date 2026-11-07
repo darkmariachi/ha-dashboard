@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ImagePlus, Loader2, ScanFace, Sparkles, Star, Wifi, X } from "lucide-react";
+import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, Wifi, X } from "lucide-react";
+import { Sheet } from "../home/Sheet";
 import {
   HOUSEHOLD,
   IGNORE,
@@ -38,7 +39,20 @@ function day(t: number) {
 }
 
 /** "Who is this?" with the phone's own picker, then Save. */
-function WhoSelect({ log, suggestion, busy, onPick }: { log: VisitLog; suggestion?: string; busy: boolean; onPick: (subject: string) => void }) {
+function WhoSelect({
+  log,
+  suggestion,
+  busy,
+  onPick,
+  onIgnore,
+}: {
+  log: VisitLog;
+  suggestion?: string;
+  busy: boolean;
+  onPick: (subject: string) => void;
+  /** Shows a quick Ignore button beside Save. */
+  onIgnore?: () => void;
+}) {
   const household = useHouseholdNames();
   const [value, setValue] = useState(suggestion ?? "");
   // Whatever is selected (e.g. a pre-selected hint) must be an option, or
@@ -103,16 +117,51 @@ function WhoSelect({ log, suggestion, busy, onPick }: { log: VisitLog; suggestio
           className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm text-text outline-none focus:border-accent"
         />
       )}
-      <button
-        onClick={save}
-        disabled={busy || !value || (naming && !name.trim())}
-        className="flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white transition-transform active:scale-95 disabled:opacity-40"
-        style={{ background: ACCENT }}
-      >
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-        Save
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={save}
+          disabled={busy || !value || (naming && !name.trim())}
+          className="flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white transition-transform active:scale-95 disabled:opacity-40"
+          style={{ background: ACCENT }}
+        >
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+          Save
+        </button>
+        {onIgnore && (
+          <button
+            onClick={onIgnore}
+            disabled={busy}
+            className="flex items-center justify-center gap-1.5 rounded-full bg-chip px-4 py-2.5 text-sm font-semibold text-text-dim transition-transform active:scale-95 disabled:opacity-40"
+          >
+            <EyeOff size={15} /> Ignore
+          </button>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** "Ignore these faces?" — hidden from review and never matched to anyone. */
+function IgnoreSheet({ count, onConfirm, onClose }: { count: number; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <Sheet title={`Ignore ${count === 1 ? "this face" : `these ${count} faces`}?`} subtitle="They'll leave Faces to review and won't be matched to anyone." onClose={onClose}>
+      <p className="text-sm text-text-dim">
+        For strangers, delivery drivers and bad captures. Faces that closely resemble these will be hidden automatically too, so it's best not to use it
+        for someone you might want to name later.
+      </p>
+      <div className="flex gap-2 pb-1">
+        <button onClick={onClose} className="flex-1 rounded-full bg-chip py-3 text-sm font-semibold text-text active:scale-95">
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          className="flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white active:scale-95"
+          style={{ background: "#d14d5b" }}
+        >
+          <EyeOff size={16} /> Ignore
+        </button>
+      </div>
+    </Sheet>
   );
 }
 
@@ -120,6 +169,7 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmIgnore, setConfirmIgnore] = useState(false);
   const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
   const looks = cluster.nearest && cluster.nearest.subject !== hint?.id ? cluster.nearest : null;
   const days = new Set(cluster.times.map((t) => new Date(t).toDateString())).size;
@@ -184,8 +234,18 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
         </div>
       )}
       {excluded.size > 0 && <div className="text-xs text-text-dim">{excluded.size} left out — tap a face to put it back.</div>}
-      <WhoSelect log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} />
+      <WhoSelect log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} onIgnore={() => setConfirmIgnore(true)} />
       {error && <div className="text-xs text-[#ff6b6b]">{error}</div>}
+      {confirmIgnore && (
+        <IgnoreSheet
+          count={cluster.ids.length - excluded.size}
+          onClose={() => setConfirmIgnore(false)}
+          onConfirm={() => {
+            setConfirmIgnore(false);
+            pick(IGNORE);
+          }}
+        />
+      )}
     </div>
   );
 }
