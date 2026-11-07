@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { CURATED_COMPUTERS } from "../../config/computers";
 import { CURATED_CLIMATE_ENTITY, CURATED_ENERGY, CURATED_VACUUM, CURATED_WEATHER_ENTITY } from "../../config/curatedHome";
-import { DESKTOP_ALARM, DESKTOP_APPLIANCES, DESKTOP_INDOOR, DESKTOP_NETWORK, DESKTOP_SAFETY, DESKTOP_SERVER } from "../../config/desktop";
+import { DESKTOP_ALARM, DESKTOP_APPLIANCES, DESKTOP_INDOOR, DESKTOP_NETWORK, DESKTOP_SAFETY } from "../../config/desktop";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
 import { useCameraEvents, typeInfo } from "../home/ActivityFeed";
@@ -28,7 +28,7 @@ import { useEntityHistory } from "../home/useEntityHistory";
 import { useStateHistory } from "../home/useStateHistory";
 import { useWeatherForecast, type ForecastEntry } from "../home/useWeatherForecast";
 import { BarChart, LineChart, Spark, Timeline } from "./charts";
-import { clock, computerOnline, dur, fmtMbps, fmtW, isLive, mbps, num, SENSE, spans, useIssues, useOpenings } from "./data";
+import { clock, computerOnline, dur, fmtMbps, fmtW, isLive, num, rateOf, SENSE, spans, throughputSource, toMbps, useIssues, useOpenings } from "./data";
 import { Big, C, Dot, KV, Label, Panel, Ring, Segmented } from "./ui";
 
 /* ---------------------------------------------------------------- KPIs */
@@ -81,7 +81,9 @@ export function KpiRow({ go }: { go: (page: string) => void }) {
   const usageH = useEntityHistory(CURATED_ENERGY.consumption, 6, 48);
   const solarH = useEntityHistory(CURATED_ENERGY.production, 6, 48);
   const indoorH = useEntityHistory(DESKTOP_INDOOR.temperature, 24, 48);
-  const downH = useEntityHistory(DESKTOP_NETWORK.down, 6, 48);
+  const net = throughputSource(entities);
+  const netUnit = entities[net.down]?.attributes.unit_of_measurement as string | undefined;
+  const downH = useEntityHistory(net.down, 6, 48);
   const { items, indoor, away } = useOnNow();
   const { open } = useOpenings();
   const { issues } = useIssues();
@@ -94,10 +96,7 @@ export function KpiRow({ go }: { go: (page: string) => void }) {
   const climate = entities[CURATED_CLIMATE_ENTITY];
   const inside = num(entities[DESKTOP_INDOOR.temperature]) ?? (climate?.attributes.current_temperature as number | undefined) ?? null;
   const rh = num(entities[DESKTOP_INDOOR.humidity]);
-  const wanDown = entities[DESKTOP_NETWORK.wan]?.state === "off";
-  // The UPnP throughput sensors can go unavailable; fall back to skylab's LAN port.
-  const wanKnown = isLive(entities[DESKTOP_NETWORK.down]);
-  const lanH = useEntityHistory(DESKTOP_SERVER.nic.rx, 6, 48);
+  const wanDown = net.kind === "upnp" && entities[DESKTOP_NETWORK.wan]?.state === "off";
   const leftOn = away && indoor.length > 0;
   const usageParts = usage === null ? null : fmtW(usage).split(" ");
   const clients = Object.values(entitiesWithArea).filter((e) => e.domain === "device_tracker" && e.platform === "unifi" && e.entity.state === "home").length;
@@ -131,34 +130,19 @@ export function KpiRow({ go }: { go: (page: string) => void }) {
       >
         <Spark values={indoorH} color={C.violet} />
       </Kpi>
-      {wanKnown ? (
-        <Kpi
-          label="Internet"
-          icon={wanDown ? Globe : Wifi}
-          color={C.cyan}
-          alert={wanDown}
-          value={wanDown ? "DOWN" : fmtMbps(mbps(num(entities[DESKTOP_NETWORK.down])))}
-          unit={wanDown ? undefined : "Mb/s"}
-          sub={`↑ ${fmtMbps(mbps(num(entities[DESKTOP_NETWORK.up])))} Mb/s`}
-          delay={120}
-          onClick={() => go("devices")}
-        >
-          <Spark values={downH?.map((v) => mbps(v)!) ?? null} color={C.cyan} />
-        </Kpi>
-      ) : (
-        <Kpi
-          label="LAN · skylab"
-          icon={Wifi}
-          color={C.green}
-          value={num(entities[DESKTOP_SERVER.nic.rx])?.toFixed(1) ?? "—"}
-          unit="Mb/s"
-          sub={`↑ ${num(entities[DESKTOP_SERVER.nic.tx])?.toFixed(1) ?? "—"} · ${clients} clients`}
-          delay={120}
-          onClick={() => go("devices")}
-        >
-          <Spark values={lanH} color={C.green} />
-        </Kpi>
-      )}
+      <Kpi
+        label={net.label}
+        icon={wanDown ? Globe : Wifi}
+        color={net.kind === "lan" ? C.green : C.cyan}
+        alert={wanDown}
+        value={wanDown ? "DOWN" : fmtMbps(rateOf(entities, net.down))}
+        unit={wanDown ? undefined : "Mb/s"}
+        sub={`↑ ${fmtMbps(rateOf(entities, net.up))} Mb/s · ${clients} clients`}
+        delay={120}
+        onClick={() => go("devices")}
+      >
+        <Spark values={downH?.map((v) => toMbps(v, netUnit)!) ?? null} color={net.kind === "lan" ? C.green : C.cyan} />
+      </Kpi>
       <Kpi
         label="Powered on"
         icon={Power}
@@ -364,15 +348,47 @@ export function WeatherPanel({ delay = 0, className }: { delay?: number; classNa
 
 /* ------------------------------------------------------------- Cameras */
 
+/**
+ * A still that refreshes every `everyMs`. Each frame is a freshly signed
+ * camera_proxy URL (a new signature is already a new URL, so no cache
+ * buster: HA's signature covers the query string, and an extra parameter
+ * makes the request fail auth). Frames are preloaded and only swapped in
+ * once they've loaded, so the tile keeps the last good picture through a
+ * slow or failed frame. `stale` = the latest attempts are failing.
+ */
 function useSignedSnapshot(entityId: string, everyMs: number) {
   const { signPath } = useHa();
   const [src, setSrc] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    let busy = false;
     function load() {
+      if (busy) return;
+      busy = true;
       signPath(`/api/camera_proxy/${entityId}`, 60)
-        .then((url) => !cancelled && setSrc(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`))
-        .catch(() => {});
+        .then(
+          (url) =>
+            new Promise<void>((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                if (!cancelled) {
+                  setSrc(url);
+                  setStale(false);
+                }
+                resolve();
+              };
+              img.onerror = () => {
+                if (!cancelled) setStale(true);
+                resolve();
+              };
+              img.src = url;
+            }),
+        )
+        .catch(() => !cancelled && setStale(true))
+        .finally(() => {
+          busy = false;
+        });
     }
     load();
     const timer = setInterval(load, everyMs);
@@ -381,7 +397,7 @@ function useSignedSnapshot(entityId: string, everyMs: number) {
       clearInterval(timer);
     };
   }, [entityId, everyMs, signPath]);
-  return src;
+  return { src, stale };
 }
 
 /** Live MJPEG for the full-screen view. */
@@ -413,8 +429,8 @@ function CameraLive({ entityId, label, onClose }: { entityId: string; label: str
 }
 
 export function CameraTile({ entityId, label, everyMs = 4000, className }: { entityId: string; label: string; everyMs?: number; className?: string }) {
-  const src = useSignedSnapshot(entityId, everyMs);
-  const [failed, setFailed] = useState(false);
+  const { src, stale } = useSignedSnapshot(entityId, everyMs);
+  const failed = stale && !src;
   const [live, setLive] = useState(false);
   const now = useNow(1000);
   return (
@@ -423,8 +439,8 @@ export function CameraTile({ entityId, label, everyMs = 4000, className }: { ent
         onClick={() => setLive(true)}
         className={clsx("group relative overflow-hidden rounded-md border border-dx-line bg-black text-left", className ?? "aspect-video")}
       >
-        {src && !failed ? (
-          <img src={src} alt={label} onError={() => setFailed(true)} onLoad={() => setFailed(false)} className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100" />
+        {src ? (
+          <img src={src} alt={label} className={clsx("absolute inset-0 h-full w-full object-cover transition-opacity group-hover:opacity-100", stale ? "opacity-50" : "opacity-90")} />
         ) : (
           <div className="dx-grid absolute inset-0 flex items-center justify-center text-dx-faint">
             <Cctv size={22} />
@@ -433,7 +449,7 @@ export function CameraTile({ entityId, label, everyMs = 4000, className }: { ent
         <div className="absolute inset-0 bg-[linear-gradient(transparent_60%,rgba(0,0,0,0.7))]" />
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-2">
           <span className="flex items-center gap-1.5 rounded-sm bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-            <Dot color={failed ? C.faint : C.red} /> {label}
+            <Dot color={failed || stale ? C.faint : C.red} /> {label}
           </span>
           <Maximize2 size={13} className="text-white/0 transition-colors group-hover:text-white/80" />
         </div>

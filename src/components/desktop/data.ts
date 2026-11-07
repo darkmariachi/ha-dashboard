@@ -1,7 +1,15 @@
 import type { HassEntities, HassEntity } from "home-assistant-js-websocket";
 import type { CuratedComputer } from "../../config/computers";
 import { CURATED_DOOR_SENSORS, CURATED_ENERGY } from "../../config/curatedHome";
-import { DESKTOP_ALARM, DESKTOP_APPLIANCES, DESKTOP_NETWORK, DESKTOP_SAFETY, DESKTOP_WINDOWS, LOW_BATTERY_PCT } from "../../config/desktop";
+import {
+  DESKTOP_ALARM,
+  DESKTOP_APPLIANCES,
+  DESKTOP_NETWORK,
+  DESKTOP_SAFETY,
+  DESKTOP_SERVER,
+  DESKTOP_WINDOWS,
+  LOW_BATTERY_PCT,
+} from "../../config/desktop";
 import { useHa } from "../../ha/HaProvider";
 import type { StatePoint } from "../home/useStateHistory";
 
@@ -25,9 +33,54 @@ export function fmtW(w: number | null) {
   return Math.abs(w) >= 1000 ? `${(w / 1000).toFixed(2)} kW` : `${Math.round(w)} W`;
 }
 
-/** KiB/s (UPnP) -> Mbps. */
-export const mbps = (kib: number | null) => (kib === null ? null : (kib * 1024 * 8) / 1e6);
 export const fmtMbps = (v: number | null) => (v === null ? "—" : v >= 100 ? v.toFixed(0) : v.toFixed(1));
+
+/** A data-rate reading in Mbit/s, whatever unit the sensor reports. */
+export function toMbps(v: number | null, unit: string | undefined) {
+  if (v === null) return null;
+  switch (unit) {
+    case "Mbit/s":
+      return v;
+    case "kbit/s":
+      return v / 1000;
+    case "Gbit/s":
+      return v * 1000;
+    case "bit/s":
+      return v / 1e6;
+    case "MB/s":
+      return v * 8;
+    case "kB/s":
+      return (v * 8) / 1000;
+    case "B/s":
+      return (v * 8) / 1e6;
+    case "GB/s":
+      return v * 8000;
+    default:
+      // The UDM's UPnP sensors: KiB/s.
+      return (v * 1024 * 8) / 1e6;
+  }
+}
+
+export interface ThroughputSource {
+  kind: "upnp" | "wan-port" | "lan";
+  label: string;
+  down: string;
+  up: string;
+}
+
+/** Where internet throughput comes from: UPnP, else the UDM's WAN port
+ * sensors, else (not internet at all) skylab's LAN port. */
+export function throughputSource(entities: HassEntities): ThroughputSource {
+  if (isLive(entities[DESKTOP_NETWORK.down])) return { kind: "upnp", label: "Internet", down: DESKTOP_NETWORK.down, up: DESKTOP_NETWORK.up };
+  if (isLive(entities[DESKTOP_NETWORK.wanPort.down]))
+    return { kind: "wan-port", label: "Internet", down: DESKTOP_NETWORK.wanPort.down, up: DESKTOP_NETWORK.wanPort.up };
+  return { kind: "lan", label: "LAN · skylab", down: DESKTOP_SERVER.nic.rx, up: DESKTOP_SERVER.nic.tx };
+}
+
+/** A throughput sensor's reading in Mbit/s. */
+export function rateOf(entities: HassEntities, id: string) {
+  return toMbps(num(entities[id]), entities[id]?.attributes.unit_of_measurement as string | undefined);
+}
 
 /** "3d 4h", "2h 10m", "5m". */
 export function dur(ms: number) {

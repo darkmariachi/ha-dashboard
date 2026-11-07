@@ -13,7 +13,7 @@ import { DAYS, addSpan, dayStarts, hm, mondayStart } from "../devices/screenTime
 import { useEntityHistory } from "../home/useEntityHistory";
 import { useStateHistory, type StatePoint } from "../home/useStateHistory";
 import { LineChart, StackedBars } from "./charts";
-import { computerOnline, dur, fmtMbps, isLive, mbps, num } from "./data";
+import { computerOnline, dur, fmtMbps, isLive, num, rateOf, throughputSource, toMbps } from "./data";
 import { Big, Btn, C, Dot, HBar, KV, Label, Panel, Ring, Segmented } from "./ui";
 
 const HOST_COLORS = [C.cyan, C.pink, C.violet, C.green];
@@ -415,12 +415,15 @@ export function NetworkConsole({ delay = 0 }: { delay?: number }) {
   const [range, setRange] = useState<"6h" | "24h">("6h");
   const hours = range === "6h" ? 6 : 24;
   const wan = entities[DESKTOP_NETWORK.wan];
-  const wanKnown = isLive(wan) && isLive(entities[DESKTOP_NETWORK.down]);
-  const downH = useEntityHistory(DESKTOP_NETWORK.down, hours, 72);
-  const upH = useEntityHistory(DESKTOP_NETWORK.up, hours, 72);
-  const rxH = useEntityHistory(DESKTOP_SERVER.nic.rx, hours, 72);
-  const txH = useEntityHistory(DESKTOP_SERVER.nic.tx, hours, 72);
+  const src = throughputSource(entities);
+  const internet = src.kind !== "lan";
+  // Only UPnP reports WAN up/down; the port sensors just carry traffic.
+  const wanDown = src.kind === "upnp" && wan?.state === "off";
+  const unit = (id: string) => entities[id]?.attributes.unit_of_measurement as string | undefined;
+  const downH = useEntityHistory(src.down, hours, 72);
+  const upH = useEntityHistory(src.up, hours, 72);
   const modem = entities[DESKTOP_NETWORK.modem];
+  const statusColor = !internet ? C.dim : wanDown ? C.red : C.green;
 
   const clients = Object.values(entitiesWithArea).filter((e) => e.domain === "device_tracker" && e.platform === "unifi" && e.entity.state === "home");
   const wired = clients.filter((c) => c.entity.attributes.is_wired).length;
@@ -443,12 +446,9 @@ export function NetworkConsole({ delay = 0 }: { delay?: number }) {
       delay={delay}
       right={
         <div className="flex items-center gap-4">
-          <span
-            className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]"
-            style={{ color: !wanKnown ? C.dim : wan?.state === "off" ? C.red : C.green }}
-          >
-            <Dot color={!wanKnown ? C.faint : wan?.state === "off" ? C.red : C.green} pulse={wanKnown && wan?.state !== "off"} />
-            {!wanKnown ? "WAN stats offline" : wan?.state === "off" ? "WAN down" : "WAN up"}
+          <span className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: statusColor }}>
+            <Dot color={internet ? statusColor : C.faint} pulse={internet && !wanDown} />
+            {!internet ? "WAN stats offline" : wanDown ? "WAN down" : src.kind === "wan-port" ? "WAN · UDM port 9" : "WAN up"}
           </span>
           <div className="w-[110px]">
             <Segmented value={range} onChange={setRange} options={[{ value: "6h", label: "6h" }, { value: "24h", label: "24h" }]} />
@@ -458,67 +458,38 @@ export function NetworkConsole({ delay = 0 }: { delay?: number }) {
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-1">
-          {wanKnown ? (
-            <>
-              <div className="mb-2 grid grid-cols-3 gap-4">
-                <div>
-                  <Label>↓ Internet</Label>
-                  <Big value={fmtMbps(mbps(num(entities[DESKTOP_NETWORK.down])))} unit="Mb/s" color={C.cyan} size={24} />
-                </div>
-                <div>
-                  <Label>↑ Internet</Label>
-                  <Big value={fmtMbps(mbps(num(entities[DESKTOP_NETWORK.up])))} unit="Mb/s" color={C.pink} size={24} />
-                </div>
-                <div>
-                  <Label>Modem</Label>
-                  <Big value={modem?.state ?? "—"} size={18} />
-                </div>
+          <div className="mb-2 flex items-start justify-between gap-4">
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <Label>{internet ? "↓ Internet" : "skylab ↓"}</Label>
+                <Big value={fmtMbps(rateOf(entities, src.down))} unit="Mb/s" color={internet ? C.cyan : C.green} size={24} />
               </div>
-              <LineChart
-                hours={hours}
-                height={120}
-                floor={0}
-                format={(x) => fmtMbps(x)}
-                series={[
-                  ...(downH ? [{ label: "Down", values: downH.map((x) => mbps(x)!), color: C.cyan, fill: true }] : []),
-                  ...(upH ? [{ label: "Up", values: upH.map((x) => mbps(x)!), color: C.pink }] : []),
-                ]}
-              />
-            </>
-          ) : (
-            <>
-              <div className="mb-2 flex items-start justify-between gap-4">
-                <div className="grid grid-cols-3 gap-6">
-                  <div>
-                    <Label>skylab ↓</Label>
-                    <Big value={num(entities[DESKTOP_SERVER.nic.rx])?.toFixed(1) ?? "—"} unit="Mb/s" color={C.green} size={24} />
-                  </div>
-                  <div>
-                    <Label>skylab ↑</Label>
-                    <Big value={num(entities[DESKTOP_SERVER.nic.tx])?.toFixed(1) ?? "—"} unit="Mb/s" color={C.violet} size={24} />
-                  </div>
-                  <div>
-                    <Label>Modem</Label>
-                    <Big value={modem?.state ?? "—"} size={18} color={modem?.state === "connected" ? C.green : undefined} />
-                  </div>
-                </div>
-                <p className="max-w-[300px] text-right text-[11px] leading-snug text-dx-faint">
-                  Internet throughput comes from the UDM's UPnP integration, which has been unavailable
-                  {wan?.last_changed ? ` since ${new Date(wan.last_changed).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}. Showing skylab's LAN port instead.
-                </p>
+              <div>
+                <Label>{internet ? "↑ Internet" : "skylab ↑"}</Label>
+                <Big value={fmtMbps(rateOf(entities, src.up))} unit="Mb/s" color={internet ? C.pink : C.violet} size={24} />
               </div>
-              <LineChart
-                hours={hours}
-                height={120}
-                floor={0}
-                format={(x) => x.toFixed(1)}
-                series={[
-                  ...(rxH ? [{ label: "skylab RX", values: rxH, color: C.green, fill: true }] : []),
-                  ...(txH ? [{ label: "skylab TX", values: txH, color: C.violet }] : []),
-                ]}
-              />
-            </>
-          )}
+              <div>
+                <Label>Modem</Label>
+                <Big value={modem?.state ?? "—"} size={18} color={modem?.state === "connected" ? C.green : undefined} />
+              </div>
+            </div>
+            {!internet && (
+              <p className="max-w-[300px] text-right text-[11px] leading-snug text-dx-faint">
+                No internet throughput: UPnP is off on the UDM, and the UniFi integration's WAN port sensors (port 9) aren't reporting.
+                Showing skylab's LAN port instead.
+              </p>
+            )}
+          </div>
+          <LineChart
+            hours={hours}
+            height={120}
+            floor={0}
+            format={(x) => fmtMbps(x)}
+            series={[
+              ...(downH ? [{ label: internet ? "Down" : "skylab RX", values: downH.map((x) => toMbps(x, unit(src.down))!), color: internet ? C.cyan : C.green, fill: true }] : []),
+              ...(upH ? [{ label: internet ? "Up" : "skylab TX", values: upH.map((x) => toMbps(x, unit(src.up))!), color: internet ? C.pink : C.violet }] : []),
+            ]}
+          />
         </div>
 
         <div className="flex flex-col gap-3 border-dx-line xl:border-l xl:pl-5">

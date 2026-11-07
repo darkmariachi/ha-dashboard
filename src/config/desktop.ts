@@ -46,6 +46,10 @@ export const DESKTOP_NETWORK = {
   down: "sensor.unifi_dream_machine_kib_s_received_2",
   up: "sensor.unifi_dream_machine_kib_s_sent_2",
   modem: "sensor.cable_internet_state",
+  /** The UDM Pro's WAN port (port 9 = eth8) from the UniFi integration:
+   * RX = download. Second choice after UPnP; these only exist with the
+   * integration's "bandwidth sensors" option on. */
+  wanPort: { down: "sensor.orion_port_9_rx", up: "sensor.orion_port_9_tx" },
 };
 
 /** Battery-powered things at or below this % are listed as low. */
