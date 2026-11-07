@@ -70,7 +70,9 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
       if (kept.length) data.sessions[id] = kept;
       else delete data.sessions[id];
     }
-    for (const id of Object.keys(data.info)) if (!data.sessions[id]) delete data.info[id];
+    // Device info stays while the device is known (data.names), even with no
+    // visits on record: devices from before the log started keep their last
+    // IP / last-seen time, which the Visitors page matches against faces.
   }
 
   /** Keep a tracker's network identity; returns true if it changed. */
