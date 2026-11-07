@@ -106,7 +106,9 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
     const to = encodeURIComponent(new Date().toISOString());
     for (let i = 0; i < ids.length; i += 25) {
       const chunk = ids.slice(i, i + 25);
-      const url = `${haUrl}/api/history/period/${from}?end_time=${to}&filter_entity_id=${chunk.join(",")}`;
+      // significant_changes_only=0: the IP usually arrives in an
+      // attribute-only update just after the device joins.
+      const url = `${haUrl}/api/history/period/${from}?end_time=${to}&filter_entity_id=${chunk.join(",")}&significant_changes_only=0`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) });
       if (!res.ok) throw new Error(`history ${res.status}`);
       for (const series of await res.json()) {
