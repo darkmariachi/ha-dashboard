@@ -19,6 +19,7 @@ import {
   type Visitor,
 } from "../../lib/visitors";
 import { Sheet } from "../home/Sheet";
+import { FaceReviewSection, PersonFaces } from "./Faces";
 
 const HOME_GREEN = "#3ee08f";
 const ACCENT = "#4f79c9";
@@ -193,6 +194,8 @@ export function VisitorsPanel() {
         </>
       )}
 
+      <FaceReviewSection log={log} onChanged={refresh} title={(text) => <SectionTitle>{text}</SectionTitle>} />
+
       {log.people.length === 0 && (
         <p className="hero-shadow mt-3 text-center text-xs text-white/75">
           Tap a device to say whose phone it is. Visits from the last 10 days come along.
@@ -355,6 +358,8 @@ function PersonSheet({
       }
       onClose={onClose}
     >
+      <PersonFaces subject={person.id} name={person.name} />
+
       <VisitHistory visits={visits} now={now} limit={20} />
 
       <div className="flex flex-col gap-3 border-t border-border pt-4">

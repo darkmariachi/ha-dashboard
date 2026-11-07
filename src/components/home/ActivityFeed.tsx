@@ -6,6 +6,7 @@ import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
 import { Sheet } from "./Sheet";
 import { useStateHistory } from "./useStateHistory";
+import { useFaceNames } from "../../lib/useFaceNames";
 
 export interface CameraEvent {
   id: string;
@@ -182,6 +183,9 @@ function EventSheet({ event, onClose }: { event: CameraEvent; onClose: () => voi
 export function ActivityFeed({ compact = false, limit = 40 }: { compact?: boolean; limit?: number }) {
   const now = useNow(60_000);
   const events = useCameraEvents(now);
+  // Person / ring detections the face service recognised get the name.
+  const faceName = useFaceNames(FEED_HOURS);
+  const who = (e: CameraEvent) => (e.type === "person" || e.type === "ring" ? faceName(e.source.camera, e.t) : null);
   const [filter, setFilter] = useState("all");
   const [open, setOpen] = useState<CameraEvent | null>(null);
 
@@ -207,7 +211,7 @@ export function ActivityFeed({ compact = false, limit = 40 }: { compact?: boolea
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2.5 pb-1.5 pt-5 text-white">
                     <div className="flex items-center gap-1 text-xs font-semibold">
                       {createElement(info.icon, { size: 12 })}
-                      {info.label} · {e.source.label}
+                      {who(e) ?? info.label} · {e.source.label}
                     </div>
                     <div className="text-[11px] opacity-80">{when(e.t, now)}</div>
                   </div>
@@ -262,9 +266,11 @@ export function ActivityFeed({ compact = false, limit = 40 }: { compact?: boolea
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-sm font-semibold text-text">
                       <span style={{ color: info.color }}>{createElement(info.icon, { size: 15 })}</span>
-                      {info.label}
+                      {who(e) ?? info.label}
                     </div>
-                    <div className="truncate text-[13px] text-text-dim">{e.source.label}</div>
+                    <div className="truncate text-[13px] text-text-dim">
+                      {who(e) ? `${info.label} · ${e.source.label}` : e.source.label}
+                    </div>
                     <div className="text-xs text-text-dim">{when(e.t, now)}</div>
                   </div>
                 </button>

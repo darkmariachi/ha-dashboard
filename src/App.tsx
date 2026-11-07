@@ -18,6 +18,7 @@ import { TvScreen } from "./components/tv/TvScreen";
 import { CaseScreen } from "./components/case/CaseScreen";
 import { WallScreen } from "./components/wall/WallScreen";
 import { DesktopScreen } from "./components/desktop/DesktopScreen";
+import { VisitorsPage } from "./components/visitors/VisitorsPage";
 
 /** Shown while a saved login reconnects on launch. Same navy as the PWA's
  * manifest background, so Android's launch splash fades straight into it. */
@@ -112,6 +113,7 @@ function App() {
           <Route path="/wall" element={<WallScreen />} />
           <Route path="/desktop/*" element={<DesktopScreen />} />
           <Route path="/insights" element={<InsightsPage />} />
+          <Route path="/visitors" element={<VisitorsPage />} />
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/area/:areaSlug" element={<AreaPage />} />
           <Route path="/settings" element={<SettingsPage />} />

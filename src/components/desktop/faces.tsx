@@ -1,53 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { Check, ImagePlus, Loader2, ScanFace, X } from "lucide-react";
-import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
-import { useHa } from "../../ha/HaProvider";
 import {
   HOUSEHOLD,
   IGNORE,
   assignFaces,
-  enrollFace,
+  camLabel,
   faceClusters,
-  faceSightings,
   faceStatus,
   facesOf,
-  householdName,
+  suggestFor,
+  uploadPhotos,
   type Face,
   type FaceCluster,
   type FaceStatus,
-  type Sighting,
 } from "../../lib/faces";
+import { useHouseholdNames } from "../../lib/useFaceNames";
 import { useNow } from "../../lib/useNow";
-import { fetchVisitLog, saveVisitor, visitsOf, type VisitLog } from "../../lib/visitors";
+import { saveVisitor, type VisitLog } from "../../lib/visitors";
 import { dur } from "./data";
 import { Btn, C, Dot, Label, Panel } from "./ui";
 
-const CAMERA_LABEL: Record<string, string> = {
-  "camera.g4_doorbell_pro_medium": "Front door",
-  "camera.driveway_medium": "Driveway",
-  upload: "Uploaded",
-};
-const camLabel = (c: string) => CAMERA_LABEL[c] ?? c;
 const when = (t: number) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-/** A visitor phone on the Wi-Fi around a face's time counts as a hint: from
- * 20 min before it joined (they're at the door first) to 5 min after it
- * left. */
-const BEFORE_JOIN = 20 * 60_000;
-const AFTER_LEAVE = 5 * 60_000;
 
-function useHouseholdNames() {
-  const { entities } = useHa();
-  return HOUSEHOLD_PEOPLE.map((id) => ((entities[id]?.attributes.friendly_name as string | undefined) ?? id.split(".")[1]).split(" ")[0]);
-}
-
-/** Display name for a subject string. */
-export function subjectName(subject: string | null, log: VisitLog | null) {
-  if (!subject) return null;
-  if (subject === IGNORE) return "Ignored";
-  return householdName(subject) ?? log?.people.find((p) => p.id === subject)?.name ?? subject;
-}
 
 /* --------------------------------------------------------- who-is-this */
 
@@ -128,17 +104,6 @@ function WhoPicker({
 }
 
 /* ---------------------------------------------------------- review panel */
-
-function suggestFor(cluster: FaceCluster, log: VisitLog, now: number) {
-  let best: { id: string; name: string; hits: number } | null = null;
-  for (const p of log.people) {
-    const visits = visitsOf(p.devices, log.sessions);
-    const hits = cluster.times.filter((t) => visits.some((v) => t >= v.start - BEFORE_JOIN && t <= (v.end ?? now) + AFTER_LEAVE)).length;
-    if (hits > (best?.hits ?? 0)) best = { id: p.id, name: p.name, hits };
-  }
-  if (!best || best.hits < Math.max(2, Math.ceil(cluster.times.length * 0.4))) return null;
-  return best;
-}
 
 function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log: VisitLog; now: number; onDone: () => void }) {
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
@@ -303,24 +268,6 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
 
 /* ------------------------------------------------------ visitor gallery */
 
-/** Downscale a picked photo before upload (phones shoot 12 MP+). */
-function readScaled(file: File, max = 1600): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * s);
-      c.height = Math.round(img.height * s);
-      c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL("image/jpeg", 0.9));
-    };
-    img.onerror = () => reject(new Error("Couldn't read that image"));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
 /** A person's faces: confirmed ones solid, auto-matched ones dashed with
  * confirm / reject, plus reference photo upload. */
 export function SubjectFaces({ subject, name, color }: { subject: string; name: string; color: string }) {
@@ -345,18 +292,8 @@ export function SubjectFaces({ subject, name, color }: { subject: string; name: 
     if (!files?.length) return;
     setBusy(true);
     setMessage(null);
-    let ok = 0;
-    const errors: string[] = [];
-    for (const f of [...files].slice(0, 10)) {
-      try {
-        await enrollFace(subject, await readScaled(f));
-        ok++;
-      } catch (e) {
-        errors.push(`${f.name}: ${(e as Error).message}`);
-      }
-    }
+    setMessage(await uploadPhotos(subject, files));
     setBusy(false);
-    setMessage([ok ? `Added ${ok} reference ${ok === 1 ? "photo" : "photos"}.` : "", ...errors].filter(Boolean).join(" "));
     load();
   }
 
@@ -419,42 +356,4 @@ export function SubjectFaces({ subject, name, color }: { subject: string; name: 
   );
 }
 
-/* ------------------------------------------- names for the event stream */
-
-/** Who was recognised at a camera around a time: for labelling detections
- * in the event stream ("Sandra · Front door"). */
-export function useFaceNames(hours: number) {
-  const [sightings, setSightings] = useState<Sighting[]>([]);
-  const [log, setLog] = useState<VisitLog | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    function load() {
-      faceSightings(Date.now() - hours * 3600_000)
-        .then((s) => !cancelled && setSightings(s))
-        .catch(() => {});
-      fetchVisitLog()
-        .then((l) => !cancelled && setLog(l))
-        .catch(() => {});
-    }
-    load();
-    const t = setInterval(load, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, [hours]);
-
-  return useCallback(
-    (camera: string, t: number) => {
-      const names = new Set<string>();
-      for (const s of sightings) {
-        if (s.camera === camera && Math.abs(s.t - t) <= 4000) {
-          const n = subjectName(s.subject, log);
-          if (n) names.add(n);
-        }
-      }
-      return names.size ? [...names].join(", ") : null;
-    },
-    [sightings, log],
-  );
-}
+export { useFaceNames } from "../../lib/useFaceNames";
