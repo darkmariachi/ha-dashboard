@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import clsx from "clsx";
-import { Bell, CalendarDays, Clock, EyeOff, History, Loader2, Smartphone, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Bell, CalendarDays, Check, Clock, ExternalLink, EyeOff, History, Loader2, Smartphone, Trash2, UserPlus, Users, X } from "lucide-react";
+import type { HassEntities } from "home-assistant-js-websocket";
 import { HOUSEHOLD_PEOPLE } from "../../config/curatedHome";
+import { UNIFI_NETWORK } from "../../config/desktop";
 import { useHa } from "../../ha/HaProvider";
 import { useNow } from "../../lib/useNow";
-import { deleteVisitor, fetchVisitLog, hideDevice, saveVisitor, visitsOf, type Session, type VisitLog, type Visitor } from "../../lib/visitors";
+import {
+  deleteVisitor,
+  fetchVisitLog,
+  hideDevice,
+  saveVisitor,
+  visitsOf,
+  type DeviceInfo,
+  type Session,
+  type VisitLog,
+  type Visitor,
+} from "../../lib/visitors";
 import { Timeline } from "./charts";
 import { dur } from "./data";
 import { Big, Btn, C, Dot, Label, Panel, Switch } from "./ui";
@@ -37,6 +49,103 @@ function lastSeen(visits: Session[], here: boolean, now: number) {
 
 const INPUT =
   "rounded-md border border-dx-line bg-dx-raise px-2.5 py-1.5 text-[12px] text-dx-text outline-none placeholder:text-dx-faint focus:border-dx-cyan/60";
+
+/* ------------------------------------------------------ network identity */
+
+const BAND: Record<string, string> = { ng: "2.4 GHz", na: "5 GHz", "6e": "6 GHz" };
+
+interface Net extends DeviceInfo {
+  /** The IP is the one it has right now (connected), not a remembered one. */
+  live: boolean;
+}
+
+/** A device's network identity: live from its HA tracker while connected,
+ * otherwise what the visit log remembered. */
+function netOf(entityId: string, log: VisitLog, entities: HassEntities): Net {
+  const kept = log.info?.[entityId] ?? {};
+  const e = entities[entityId];
+  const a = e?.attributes ?? {};
+  const here = e?.state === "home";
+  return {
+    ...kept,
+    mac: (a.mac as string | undefined) ?? kept.mac,
+    oui: (a.oui as string | undefined) ?? kept.oui,
+    essid: (here && (a.essid as string | undefined)) || kept.essid,
+    radio: (here && (a.radio as string | undefined)) || kept.radio,
+    ip: (here && (a.ip as string | undefined)) || kept.ip,
+    live: here && !!a.ip,
+  };
+}
+
+/** Click to copy; shows a check for a moment. */
+function Copy({ text, children, className, title }: { text: string; children: React.ReactNode; className?: string; title?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      onClick={(ev) => {
+        ev.stopPropagation();
+        navigator.clipboard?.writeText(text).then(() => {
+          setDone(true);
+          setTimeout(() => setDone(false), 1200);
+        });
+      }}
+      title={title ?? `Copy ${text}`}
+      className={clsx("dx-num inline-flex items-center gap-1 rounded px-0.5 text-left hover:bg-white/[0.06]", className)}
+    >
+      {children}
+      {done && <Check size={10} className="text-dx-green" />}
+    </button>
+  );
+}
+
+/** Opens UniFi Network's Clients page, copying the MAC to paste in its search. */
+function UnifiLink({ mac }: { mac?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <a
+      href={`${UNIFI_NETWORK.url}/network/${UNIFI_NETWORK.site}/clients`}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(ev) => {
+        ev.stopPropagation();
+        if (!mac) return;
+        navigator.clipboard?.writeText(mac).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2500);
+        });
+      }}
+      title={mac ? `Open UniFi Clients · copies ${mac} to paste in its search` : "Open UniFi Clients"}
+      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-dx-line px-2 py-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-dx-dim transition-colors hover:border-dx-cyan/50 hover:text-dx-cyan"
+    >
+      {copied ? <Check size={11} className="text-dx-green" /> : <ExternalLink size={11} />}
+      {copied ? "MAC copied" : "UniFi"}
+    </a>
+  );
+}
+
+/** IP (green when it's the current one) over MAC, for table cells. */
+function AddressCell({ net, now }: { net: Net; now: number }) {
+  return (
+    <div className="flex flex-col items-start leading-tight">
+      {net.ip ? (
+        <Copy
+          text={net.ip}
+          className={net.live ? "text-dx-green" : "text-dx-text"}
+          title={net.live ? "Current IP · click to copy" : `Last IP${net.ipAt ? `, ${dur(now - net.ipAt)} ago` : ""} · click to copy`}
+        >
+          {net.ip}
+        </Copy>
+      ) : (
+        <span className="text-dx-faint">no IP yet</span>
+      )}
+      {net.mac && (
+        <Copy text={net.mac} className="text-[10px] text-dx-faint">
+          {net.mac}
+        </Copy>
+      )}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------- heatmap */
 
@@ -113,6 +222,7 @@ function VisitorDetail({
   onChanged: () => Promise<unknown>;
   onRemoved: () => void;
 }) {
+  const { entities } = useHa();
   const [name, setName] = useState(person.name);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -226,22 +336,69 @@ function VisitorDetail({
         </div>
         <div>
           <Label className="mb-1">Devices</Label>
-          {person.devices.map((d) => (
-            <div key={d} className="flex items-center gap-2 border-b border-dashed border-dx-line py-1.5 text-[12px] last:border-0">
-              <Smartphone size={13} style={{ color: isHere(d) ? C.green : C.faint }} />
-              <span className="min-w-0 flex-1 truncate text-dx-text">{log.names[d] ?? d}</span>
-              {person.devices.length > 1 && (
-                <button
-                  onClick={() => save({ devices: person.devices.filter((x) => x !== d) })}
-                  aria-label="Remove device"
-                  title="Remove this device from them"
-                  className="text-dx-faint hover:text-dx-red"
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-          ))}
+          {person.devices.map((d) => {
+            const net = netOf(d, log, entities);
+            return (
+              <div key={d} className="flex flex-col gap-1 border-b border-dashed border-dx-line py-2 text-[12px] last:border-0">
+                <div className="flex items-center gap-2">
+                  <Smartphone size={13} style={{ color: isHere(d) ? C.green : C.faint }} />
+                  <span className="min-w-0 flex-1 truncate text-dx-text">{log.names[d] ?? d}</span>
+                  <UnifiLink mac={net.mac} />
+                  {person.devices.length > 1 && (
+                    <button
+                      onClick={() => save({ devices: person.devices.filter((x) => x !== d) })}
+                      aria-label="Remove device"
+                      title="Remove this device from them"
+                      className="text-dx-faint hover:text-dx-red"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-[48px_minmax(0,1fr)] items-baseline gap-x-2 gap-y-0.5 pl-5 text-[11px]">
+                  <span className="text-dx-faint">IP</span>
+                  <span>
+                    {net.ip ? (
+                      <Copy text={net.ip} className={net.live ? "text-dx-green" : "text-dx-text"}>
+                        {net.ip}
+                      </Copy>
+                    ) : (
+                      <span className="text-dx-faint">not seen yet</span>
+                    )}
+                    {net.ip && <span className="ml-1.5 text-[10px] text-dx-faint">{net.live ? "now" : net.ipAt ? `${dur(now - net.ipAt)} ago` : "last seen"}</span>}
+                  </span>
+                  {(net.ips?.length ?? 0) > 1 && (
+                    <>
+                      <span className="text-dx-faint">Earlier</span>
+                      <span className="dx-num truncate text-dx-dim">{net.ips!.filter((x) => x !== net.ip).join(", ")}</span>
+                    </>
+                  )}
+                  <span className="text-dx-faint">MAC</span>
+                  <span>
+                    {net.mac ? (
+                      <Copy text={net.mac} className="text-dx-text">
+                        {net.mac}
+                      </Copy>
+                    ) : (
+                      <span className="text-dx-faint">—</span>
+                    )}
+                  </span>
+                  {net.oui && (
+                    <>
+                      <span className="text-dx-faint">Vendor</span>
+                      <span className="truncate text-dx-dim">{net.oui}</span>
+                    </>
+                  )}
+                  {(net.essid || net.radio) && (
+                    <>
+                      <span className="text-dx-faint">Wi-Fi</span>
+                      <span className="truncate text-dx-dim">{[net.essid, net.radio && (BAND[net.radio] ?? net.radio)].filter(Boolean).join(" · ")}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
           <p className="mt-2 text-[10.5px] leading-snug text-dx-faint">New phone? Assign it from New devices.</p>
         </div>
       </div>
@@ -272,7 +429,7 @@ function AssignRow({ entityId, log, onDone, onCancel }: { entityId: string; log:
 
   return (
     <tr className="bg-dx-cyan/[0.04]">
-      <td colSpan={5} className="px-2 py-2.5">
+      <td colSpan={6} className="px-2 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <input autoFocus className={clsx(INPUT, "w-48")} placeholder="New visitor's name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && name.trim() && run(() => saveVisitor({ name: name.trim(), devices: [entityId], notify: false }).then((p) => p.id))} />
           <Btn color={C.cyan} disabled={busy || !name.trim()} onClick={() => run(() => saveVisitor({ name: name.trim(), devices: [entityId], notify: false }).then((p) => p.id))}>
@@ -480,15 +637,16 @@ export function VisitorsConsole() {
                 <thead>
                   <tr className="text-left text-[9.5px] uppercase tracking-[0.14em] text-dx-faint">
                     <th className="px-4 pb-2 pt-3 font-semibold">Device</th>
+                    <th className="px-2 pb-2 pt-3 font-semibold">IP / MAC</th>
                     <th className="px-2 pb-2 pt-3 font-semibold">Last seen</th>
                     <th className="px-2 pb-2 pt-3 text-right font-semibold">Visits</th>
-                    <th className="px-2 pb-2 pt-3 text-right font-semibold">Last stay</th>
                     <th className="px-4 pb-2 pt-3" />
                   </tr>
                 </thead>
                 <tbody>
-                  {newDevices.map((d) =>
-                    assigning === d.id ? (
+                  {newDevices.map((d) => {
+                    const net = netOf(d.id, log, entities);
+                    return assigning === d.id ? (
                       <AssignRow
                         key={d.id}
                         entityId={d.id}
@@ -503,23 +661,35 @@ export function VisitorsConsole() {
                       <tr key={d.id} className="group border-t border-dashed border-dx-line hover:bg-white/[0.02]">
                         <td className="px-4 py-2">
                           <div className="flex items-center gap-2">
-                            <Smartphone size={13} style={{ color: d.here ? C.green : C.faint }} />
-                            <span className="truncate text-dx-text">{d.name}</span>
+                            <Smartphone size={13} className="shrink-0" style={{ color: d.here ? C.green : C.faint }} />
+                            <div className="min-w-0">
+                              <div className="truncate text-dx-text">{d.name}</div>
+                              {net.oui && <div className="truncate text-[10px] text-dx-faint">{net.oui}</div>}
+                            </div>
                           </div>
                         </td>
-                        <td className="dx-num px-2 text-dx-dim" style={d.here ? { color: C.green } : undefined}>
+                        <td className="px-2 py-1.5">
+                          <AddressCell net={net} now={now} />
+                        </td>
+                        <td
+                          className="dx-num px-2 text-dx-dim"
+                          style={d.here ? { color: C.green } : undefined}
+                          title={`Last stay ${dur((d.visits[0].end ?? now) - d.visits[0].start)}`}
+                        >
                           {d.here ? "here now" : `${dur(now - (d.visits[0].end ?? now))} ago`}
                         </td>
                         <td className="dx-num px-2 text-right text-dx-text">{d.visits.length}</td>
-                        <td className="dx-num px-2 text-right text-dx-dim">{dur((d.visits[0].end ?? now) - d.visits[0].start)}</td>
                         <td className="px-4 py-1.5 text-right">
-                          <Btn onClick={() => setAssigning(d.id)} className="opacity-70 group-hover:opacity-100">
-                            <UserPlus size={11} /> Assign
-                          </Btn>
+                          <div className="flex justify-end gap-1.5 opacity-70 group-hover:opacity-100">
+                            <UnifiLink mac={net.mac} />
+                            <Btn onClick={() => setAssigning(d.id)}>
+                              <UserPlus size={11} /> Assign
+                            </Btn>
+                          </div>
                         </td>
                       </tr>
-                    ),
-                  )}
+                    );
+                  })}
                 </tbody>
               </table>
             )}

@@ -16,11 +16,28 @@ export interface Session {
   end: number | null;
 }
 
+/** A device's network identity, as the push service last saw it. UniFi
+ * only reports the IP while the device is connected, so `ip` is the last
+ * one it had (at `ipAt`), and `ips` the last few distinct ones. */
+export interface DeviceInfo {
+  mac?: string;
+  oui?: string;
+  host?: string;
+  ip?: string;
+  ips?: string[];
+  ipAt?: number;
+  essid?: string;
+  radio?: string;
+  ap?: string;
+}
+
 export interface VisitLog {
   people: Visitor[];
   hidden: string[];
   names: Record<string, string>;
   sessions: Record<string, Session[]>;
+  /** Missing on push services older than this field. */
+  info?: Record<string, DeviceInfo>;
 }
 
 export function fetchVisitLog(): Promise<VisitLog> {

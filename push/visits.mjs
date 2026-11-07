@@ -35,11 +35,16 @@ const NEW_ENTITY_MS = 15 * 60_000;
  *   hidden:   [entityId]                    — "not a visitor", from the app
  *   names:    { entityId: friendly name }   — for naming new devices
  *   sessions: { entityId: [{ start, end }] } — ms, end null while there
+ *   info:     { entityId: { mac, oui, host, ip, ips, ipAt, essid, radio, ap } }
+ *             — the device's network identity, kept after it leaves so the
+ *             Visitors page can show which IP it had (UniFi only reports the
+ *             IP while it's connected). `ips` is the last few distinct IPs.
  */
 export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevice, log }) {
-  let data = { people: [], hidden: [], names: {}, sessions: {} };
+  let data = { people: [], hidden: [], names: {}, sessions: {}, info: {} };
   try {
     data = { ...data, ...JSON.parse(await readFile(file, "utf8")) };
+    data.info ??= {};
   } catch {
     /* first run */
   }
@@ -65,6 +70,51 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
       if (kept.length) data.sessions[id] = kept;
       else delete data.sessions[id];
     }
+    for (const id of Object.keys(data.info)) if (!data.sessions[id]) delete data.info[id];
+  }
+
+  /** Keep a tracker's network identity; returns true if it changed. */
+  function noteInfo(entityId, attrs, at) {
+    if (!attrs || household.has(entityId)) return false;
+    const prev = data.info[entityId] ?? {};
+    const next = {
+      ...prev,
+      mac: attrs.mac ?? prev.mac,
+      oui: attrs.oui ?? prev.oui,
+      host: attrs.host_name ?? prev.host,
+      essid: attrs.essid ?? prev.essid,
+      radio: attrs.radio ?? prev.radio,
+      ap: attrs.ap_mac ?? prev.ap,
+    };
+    if (attrs.ip) {
+      next.ip = attrs.ip;
+      next.ipAt = Math.max(at, prev.ipAt ?? 0);
+      next.ips = [attrs.ip, ...(prev.ips ?? []).filter((x) => x !== attrs.ip)].slice(0, 5);
+    }
+    const changed = JSON.stringify(next) !== JSON.stringify(prev);
+    if (changed) data.info[entityId] = next;
+    return changed;
+  }
+
+  /** HA history with attributes, for devices we have no IP for yet (a
+   * device that isn't connected right now reports none). Oldest first, so
+   * the newest IP wins. */
+  async function seedInfo(entityIds) {
+    const ids = entityIds.filter((id) => !household.has(id) && !data.info[id]?.ip && data.sessions[id]);
+    if (!ids.length) return;
+    const from = new Date(Date.now() - BACKFILL_MS).toISOString();
+    const to = encodeURIComponent(new Date().toISOString());
+    for (let i = 0; i < ids.length; i += 25) {
+      const chunk = ids.slice(i, i + 25);
+      const url = `${haUrl}/api/history/period/${from}?end_time=${to}&filter_entity_id=${chunk.join(",")}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) });
+      if (!res.ok) throw new Error(`history ${res.status}`);
+      for (const series of await res.json()) {
+        for (const st of series) noteInfo(st.entity_id ?? series[0]?.entity_id, st.attributes, Date.parse(st.last_updated ?? st.last_changed));
+      }
+    }
+    save();
+    log("visit log: device info seeded for", ids.length, "trackers");
   }
 
   /** People's own trackers, from person.* — never visitors. */
@@ -240,6 +290,7 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
         data.names[s.entity_id] = name;
         save();
       }
+      if (noteInfo(s.entity_id, s.attributes, Date.parse(s.last_updated ?? s.last_changed))) save();
       update(s.entity_id, s.state, Date.parse(s.last_changed), true);
     }
 
@@ -271,6 +322,11 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
           log("visit log backfill failed", err.message);
         }
         for (const s of msg.result) onState(s);
+        try {
+          await seedInfo(roamers.map((s) => s.entity_id));
+        } catch (err) {
+          log("visit log info seed failed", err.message);
+        }
         ready = true;
         for (const s of queued.splice(0)) onState(s);
         log("visit log connected,", roamers.length, "Wi-Fi trackers,", data.people.length, "visitors");
@@ -306,6 +362,7 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
         hidden: data.hidden,
         names: data.names,
         sessions: data.sessions,
+        info: data.info,
         here: [...track].filter(([, t]) => t.state === "home").map(([id]) => id),
       };
     },

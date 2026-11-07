@@ -91,3 +91,11 @@ export const DESKTOP_SERVER = {
     { key: "mnt_pool", label: "Media pool" },
   ],
 };
+
+/** The UniFi Network app on the UDM Pro. Visitor devices link to its
+ * Clients page (only reachable from the LAN); the device's MAC is copied to
+ * the clipboard on the way, to paste into its search. */
+export const UNIFI_NETWORK = {
+  url: "https://192.168.1.1",
+  site: "default",
+};
