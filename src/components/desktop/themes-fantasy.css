@@ -1,0 +1,245 @@
+/*
+ * Fantasy desktop themes (see themes.css for the hooks): Ocarina, after
+ * Ocarina of Time, and Northern Frost, after Skyrim.
+ */
+
+/* --------------------------------------- Ocarina (Ocarina of Time) */
+
+.dx[data-dx-theme="ocarina"] {
+  --font-dx: "Nunito Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Uncial Antiqua", Georgia, serif;
+  --dx-title-size: 13px;
+  --dx-title-track: 0.06em;
+  background:
+    radial-gradient(900px 500px at 20% -10%, rgba(111, 211, 255, 0.1), transparent 60%),
+    radial-gradient(1100px 600px at 50% 120%, rgba(92, 207, 110, 0.14), transparent 60%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55)),
+    var(--color-dx-bg);
+}
+/* Fairy lights: two layers of glowing motes drifting up and fading. */
+.dx[data-dx-theme="ocarina"] .dx-fx::before,
+.dx[data-dx-theme="ocarina"] .dx-fx::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+  left: 0;
+  top: 0;
+  animation: dx-fairies 18s ease-in-out infinite;
+}
+.dx[data-dx-theme="ocarina"] .dx-fx::before {
+  box-shadow:
+    12vw 80vh 6px 2px rgba(200, 240, 255, 0.55), 28vw 62vh 5px 1px rgba(255, 245, 190, 0.5),
+    47vw 88vh 6px 2px rgba(200, 240, 255, 0.45), 63vw 70vh 5px 1px rgba(255, 245, 190, 0.5),
+    78vw 92vh 7px 2px rgba(200, 240, 255, 0.5), 91vw 58vh 5px 1px rgba(255, 245, 190, 0.45),
+    6vw 40vh 5px 1px rgba(200, 240, 255, 0.4), 37vw 30vh 6px 1px rgba(255, 245, 190, 0.35),
+    70vw 35vh 5px 1px rgba(200, 240, 255, 0.4);
+}
+.dx[data-dx-theme="ocarina"] .dx-fx::after {
+  animation-duration: 26s;
+  animation-delay: -9s;
+  box-shadow:
+    20vw 95vh 5px 1px rgba(255, 245, 190, 0.45), 40vw 75vh 7px 2px rgba(200, 240, 255, 0.5),
+    55vw 52vh 5px 1px rgba(255, 245, 190, 0.4), 85vw 80vh 6px 2px rgba(200, 240, 255, 0.45),
+    15vw 55vh 6px 1px rgba(200, 240, 255, 0.35), 96vw 25vh 5px 1px rgba(255, 245, 190, 0.35);
+}
+@keyframes dx-fairies {
+  0% { transform: translate(0, 0); opacity: 0.2; }
+  25% { transform: translate(2vw, -6vh); opacity: 1; }
+  50% { transform: translate(-1vw, -12vh); opacity: 0.5; }
+  75% { transform: translate(1.5vw, -18vh); opacity: 0.9; }
+  100% { transform: translate(0, -24vh); opacity: 0.2; }
+}
+.dx[data-dx-theme="ocarina"] .dx-panel {
+  border-radius: 12px;
+  border: 1px solid #5d4c1c;
+  background: linear-gradient(180deg, #11291b, #0c1f14);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 197, 71, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 20px -10px rgba(0, 0, 0, 0.9);
+}
+.dx[data-dx-theme="ocarina"] .dx-panel-head {
+  border-bottom: 1px solid rgba(232, 197, 71, 0.16);
+  background: linear-gradient(180deg, rgba(232, 197, 71, 0.07), transparent);
+  border-radius: 12px 12px 0 0;
+}
+.dx[data-dx-theme="ocarina"] .dx-title {
+  color: var(--color-dx-amber);
+  text-transform: none;
+  font-weight: 400;
+  text-shadow: 0 1px 0 #000, 0 0 10px rgba(232, 197, 71, 0.25);
+}
+/* A leaf for the panel tick. */
+.dx[data-dx-theme="ocarina"] .dx-tick {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 0 100% 0 100% !important;
+  background: linear-gradient(135deg, #8ee07a, #2f8f3e) !important;
+  box-shadow: 0 0 6px rgba(92, 207, 110, 0.6) !important;
+}
+.dx[data-dx-theme="ocarina"] .dx-rail { background: rgba(6, 16, 10, 0.88); border-right-color: rgba(232, 197, 71, 0.2); }
+.dx[data-dx-theme="ocarina"] .dx-topbar { background: rgba(6, 16, 10, 0.75); border-bottom-color: rgba(232, 197, 71, 0.2); }
+.dx[data-dx-theme="ocarina"] .dx-nav { border-radius: 50%; }
+.dx[data-dx-theme="ocarina"] .dx-nav.active {
+  box-shadow: 0 0 14px -2px rgba(111, 211, 255, 0.6), inset 0 0 0 1px rgba(111, 211, 255, 0.5);
+  color: #bfeaff;
+  background: rgba(111, 211, 255, 0.1);
+}
+.dx[data-dx-theme="ocarina"] .dx-logo {
+  border-radius: 50% 50% 46% 46%;
+  background: radial-gradient(circle at 35% 30%, #9fc4ff, #3a64c9 55%, #1f3a80);
+  box-shadow: 0 0 0 1px #e8c547, 0 0 16px -2px rgba(111, 160, 255, 0.8);
+  color: #fff;
+  font-size: 18px;
+}
+.dx[data-dx-theme="ocarina"] .dx-h1 {
+  text-transform: none;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--color-dx-amber);
+  text-shadow: 0 2px 0 #3d2f08, 0 0 18px rgba(232, 197, 71, 0.35);
+}
+.dx[data-dx-theme="ocarina"] .dx-btn { border-radius: 8px; font-weight: 800; }
+.dx[data-dx-theme="ocarina"] .dx-seg { border-radius: 10px; border-color: rgba(232, 197, 71, 0.25); }
+.dx[data-dx-theme="ocarina"] .dx-seg > button { border-radius: 8px; font-weight: 800; }
+
+/* ------------------------------------------- Northern Frost (Skyrim) */
+
+.dx[data-dx-theme="frost"] {
+  --font-dx: "Josefin Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Josefin Sans Variable", ui-sans-serif, sans-serif;
+  --font-mono: "Josefin Sans Variable", ui-sans-serif, sans-serif;
+  --dx-title-size: 12px;
+  --dx-title-track: 0.3em;
+  --rule: linear-gradient(90deg, transparent, rgba(230, 226, 215, 0.55) 20%, rgba(230, 226, 215, 0.55) 80%, transparent);
+  background:
+    linear-gradient(180deg, rgba(40, 46, 54, 0.5), transparent 35%),
+    radial-gradient(1400px 400px at 50% 115%, rgba(200, 215, 230, 0.12), transparent 70%),
+    var(--color-dx-bg);
+}
+.dx[data-dx-theme="frost"] .dx-num { font-weight: 300; letter-spacing: 0.02em; }
+/* Distant mountains along the bottom edge. */
+.dx[data-dx-theme="frost"] .dx-fx {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 200' preserveAspectRatio='none'%3E%3Cpath d='M0 200V130l120-50 90 40 160-95 120 70 80-30 170 85 140-110 130 80 110-40 160 75 120-60 100 45 100-20v130z' fill='%23181b20'/%3E%3Cpath d='M0 200v-40l200-30 150 25 220-45 180 40 240-35 190 30 230-40 190 35v60z' fill='%23111316'/%3E%3C/svg%3E")
+    bottom / 100% 220px no-repeat;
+}
+/* Snow: two tiled layers drifting down at different speeds. */
+.dx[data-dx-theme="frost"] .dx-fx::before,
+.dx[data-dx-theme="frost"] .dx-fx::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 90px 120px, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(2px 2px at 160px 60px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 210px 170px, rgba(255, 255, 255, 0.5), transparent);
+  background-size: 240px 220px;
+  animation: dx-snow 22s linear infinite;
+}
+.dx[data-dx-theme="frost"] .dx-fx::after {
+  background-size: 380px 340px;
+  opacity: 0.6;
+  animation: dx-snow-far 38s linear infinite;
+  filter: blur(0.6px);
+}
+@keyframes dx-snow {
+  from { background-position: 0 0; }
+  to { background-position: 60px 660px; }
+}
+@keyframes dx-snow-far {
+  from { background-position: 0 0; }
+  to { background-position: -40px 680px; }
+}
+.dx[data-dx-theme="frost"] .dx-panel {
+  border-radius: 0;
+  border: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)), var(--color-dx-panel);
+  position: relative;
+}
+/* Ruled lines top and bottom that fade out at the ends. */
+.dx[data-dx-theme="frost"] .dx-panel::before,
+.dx[data-dx-theme="frost"] .dx-panel::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--rule);
+  pointer-events: none;
+}
+.dx[data-dx-theme="frost"] .dx-panel::before { top: 0; }
+.dx[data-dx-theme="frost"] .dx-panel::after { bottom: 0; }
+.dx[data-dx-theme="frost"] .dx-panel-head { position: relative; border-bottom: 0; }
+.dx[data-dx-theme="frost"] .dx-panel-head::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(230, 226, 215, 0.25), transparent);
+}
+.dx[data-dx-theme="frost"] .dx-title { color: var(--color-dx-text); font-weight: 300; padding-top: 2px; }
+.dx[data-dx-theme="frost"] .dx-tick {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 0 !important;
+  transform: rotate(45deg);
+  background: transparent !important;
+  border: 1px solid var(--color-dx-text);
+  box-shadow: none !important;
+}
+.dx[data-dx-theme="frost"] .dx-rail { background: rgba(8, 9, 11, 0.9); border-right: 0; box-shadow: 1px 0 0 rgba(230, 226, 215, 0.08); }
+.dx[data-dx-theme="frost"] .dx-topbar { background: rgba(8, 9, 11, 0.7); border-bottom: 0; }
+.dx[data-dx-theme="frost"] .dx-topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--rule);
+}
+.dx[data-dx-theme="frost"] .dx-nav { border-radius: 0; }
+.dx[data-dx-theme="frost"] .dx-nav.active {
+  background: transparent;
+  color: #fff;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6));
+}
+.dx[data-dx-theme="frost"] .dx-logo {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-dx-text);
+  font-size: 26px;
+  font-weight: 300;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+.dx[data-dx-theme="frost"] .dx-h1 {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 0.32em;
+  padding-top: 4px;
+}
+.dx[data-dx-theme="frost"] .dx-btn {
+  border-radius: 0;
+  background: transparent !important;
+  border-color: transparent !important;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  padding-top: 6px;
+}
+.dx[data-dx-theme="frost"] .dx-btn:hover:not(:disabled) { color: #fff !important; text-shadow: 0 0 8px rgba(255, 255, 255, 0.7); }
+.dx[data-dx-theme="frost"] .dx-seg,
+.dx[data-dx-theme="frost"] .dx-seg > button { border-radius: 0; }
+.dx[data-dx-theme="frost"] .dx-seg > button { letter-spacing: 0.18em; font-weight: 400; padding-top: 5px; }
+.dx[data-dx-theme="frost"] :is(.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl) { border-radius: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dx-fx::before, .dx-fx::after { animation: none !important; }
+}

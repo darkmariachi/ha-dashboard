@@ -17,7 +17,11 @@ import "@fontsource/barlow/700.css";
 import "@fontsource/barlow-condensed/500.css";
 import "@fontsource/barlow-condensed/600.css";
 import "@fontsource-variable/cinzel";
+import "@fontsource/uncial-antiqua";
+import "@fontsource-variable/nunito";
+import "@fontsource-variable/josefin-sans";
 import "./themes.css";
+import "./themes-fantasy.css";
 import {
   Cctv,
   ChartColumn,

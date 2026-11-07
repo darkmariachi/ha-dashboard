@@ -9,6 +9,8 @@ const PREVIEW_FONT: Record<string, { title: string; body: string; num: string; u
   vice: { title: "Pacifico", body: "Outfit Variable", num: "JetBrains Mono Variable", upper: false },
   tactical: { title: "Bebas Neue", body: "Barlow", num: "Barlow Condensed", upper: true },
   hextech: { title: "Cinzel Variable", body: "Barlow", num: "Barlow", upper: true },
+  ocarina: { title: "Uncial Antiqua", body: "Nunito Variable", num: "Nunito Variable", upper: false },
+  frost: { title: "Josefin Sans Variable", body: "Josefin Sans Variable", num: "Josefin Sans Variable", upper: true },
 };
 
 function Preview({ t }: { t: DesktopTheme }) {
@@ -22,13 +24,19 @@ function Preview({ t }: { t: DesktopTheme }) {
     vice: { radius: 14, clip: undefined },
     tactical: { radius: 0, clip: undefined },
     hextech: { radius: 0, clip: undefined },
+    ocarina: { radius: 12, clip: undefined },
+    frost: { radius: 0, clip: undefined },
   }[t.id] ?? { radius: 8, clip: undefined };
   const bg =
     t.id === "vice"
       ? "linear-gradient(180deg, #0d0620, #2a0b45 45%, #6a1257 75%, #f7854a)"
       : t.id === "hextech"
         ? `radial-gradient(260px 120px at 50% -20%, rgba(3,151,171,.35), transparent), ${p.bg}`
-        : t.id === "tactical"
+        : t.id === "ocarina"
+          ? `radial-gradient(200px 120px at 30% 20%, rgba(111,211,255,.18), transparent), radial-gradient(260px 160px at 50% 110%, rgba(92,207,110,.2), transparent), ${p.bg}`
+          : t.id === "frost"
+            ? `linear-gradient(180deg, #16181c, ${p.bg} 60%, #23262b)`
+            : t.id === "tactical"
           ? `linear-gradient(115deg, transparent 60%, rgba(255,70,85,.14) 60%, rgba(255,70,85,.14) 70%, transparent 70%), ${p.bg}`
           : p.bg;
   return (
@@ -42,7 +50,10 @@ function Preview({ t }: { t: DesktopTheme }) {
           borderRadius: shape.radius,
           clipPath: shape.clip,
           background: t.id === "hextech" ? "linear-gradient(180deg,#0a1a30,#071121)" : p.panel,
-          borderColor: t.id === "hextech" ? "#c8aa6e" : t.id === "netrunner" ? "rgba(252,238,10,.35)" : p.line,
+          borderColor:
+            t.id === "hextech" || t.id === "ocarina" ? "#a8892f" : t.id === "netrunner" ? "rgba(252,238,10,.35)" : t.id === "frost" ? "transparent" : p.line,
+          borderTopColor: t.id === "frost" ? "rgba(230,226,215,.5)" : undefined,
+          borderBottomColor: t.id === "frost" ? "rgba(230,226,215,.5)" : undefined,
           backdropFilter: t.id === "vice" ? "blur(6px)" : undefined,
           boxShadow: t.id === "vice" ? "0 0 22px -8px #ff3f9f" : undefined,
         }}
@@ -61,12 +72,13 @@ function Preview({ t }: { t: DesktopTheme }) {
           <span
             style={{
               fontFamily: f.title,
-              fontSize: t.id === "vice" ? 17 : t.id === "tactical" ? 19 : 13,
-              letterSpacing: f.upper ? "0.14em" : "0.02em",
+              fontSize: t.id === "vice" ? 17 : t.id === "tactical" ? 19 : t.id === "ocarina" ? 16 : 13,
+              letterSpacing: t.id === "frost" ? "0.3em" : f.upper ? "0.14em" : "0.02em",
               textTransform: f.upper ? "uppercase" : "none",
-              color: t.id === "netrunner" ? p.amber : t.id === "hextech" ? "#c8aa6e" : t.id === "vice" ? "#ff6fb5" : p.text,
+              color:
+                t.id === "netrunner" || t.id === "ocarina" ? p.amber : t.id === "hextech" ? "#c8aa6e" : t.id === "vice" ? "#ff6fb5" : p.text,
               textShadow: t.id === "vice" ? "0 0 10px #ff3f9f" : t.id === "netrunner" ? "2px 0 rgba(255,42,109,.7), -2px 0 rgba(0,240,255,.5)" : undefined,
-              fontWeight: t.id === "hextech" || t.id === "netrunner" ? 700 : 400,
+              fontWeight: t.id === "hextech" || t.id === "netrunner" ? 700 : t.id === "frost" ? 300 : 400,
             }}
           >
             {t.id === "vice" ? "Energy" : "Power"}
@@ -109,7 +121,7 @@ export function ThemePicker({ current, onPick, onClose }: { current: string; onP
             <X size={18} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {DESKTOP_THEMES.map((t) => {
             const on = t.id === current;
             const primary = t.palette[t.primary];
