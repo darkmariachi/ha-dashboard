@@ -22,7 +22,8 @@ import {
 } from "../../lib/visitors";
 import { Timeline } from "./charts";
 import { FaceReview, SubjectFaces } from "./faces";
-import { useAvatars, useFaceSeen } from "../../lib/useFaceNames";
+import { useAvatars, useFaceSeen, useHouseholdNames } from "../../lib/useFaceNames";
+import { Sheet } from "../home/Sheet";
 import { dur } from "./data";
 import { Big, Btn, C, Dot, Label, Panel, Switch } from "./ui";
 
@@ -655,6 +656,8 @@ export function VisitorsConsole() {
             )}
           </Panel>
 
+          <HouseholdPanel />
+
           <Panel
             title="New devices"
             icon={Smartphone}
@@ -838,5 +841,42 @@ function PhoneSuggestions({
         );
       })}
     </div>
+  );
+}
+
+/** The household's people with their faces: click one to review their
+ * faces, confirm or reject matches, and add reference photos. */
+function HouseholdPanel() {
+  const household = useHouseholdNames();
+  const subjects = useAvatars();
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <Panel title="Household" icon={Users} accent={C.green} delay={100} bodyClassName="p-2">
+      <div className="grid grid-cols-2 gap-1 2xl:grid-cols-3">
+        {household.map((n, i) => {
+          const s = subjects[`household:${n}`];
+          return (
+            <button key={n} onClick={() => setOpen(n)} className="flex items-center gap-2 rounded-md p-1.5 text-left hover:bg-white/[0.04]">
+              {s?.sample ? (
+                <img src={s.sample} alt="" className="h-8 w-8 rounded-[5px] object-cover" style={{ boxShadow: `0 0 0 1px ${PALETTE[i % PALETTE.length]}88` }} />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-dx-raise text-[12px] font-semibold text-dx-dim">{n.charAt(0)}</span>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-[12px] font-medium text-dx-text">{n}</div>
+                <div className="dx-num truncate text-[10px] text-dx-faint">
+                  {s ? `${s.n} faces · ${new Date(s.last).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "no faces yet"}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {open && (
+        <Sheet title={open} subtitle={`Household · ${subjects[`household:${open}`]?.n ?? 0} faces`} onClose={() => setOpen(null)}>
+          <SubjectFaces subject={`household:${open}`} name={open} color={C.green} />
+        </Sheet>
+      )}
+    </Panel>
   );
 }

@@ -689,3 +689,48 @@ export function DeviceSuggestions({
     </div>
   );
 }
+
+/** The household's people for the Visitors tab: each with their face
+ * count and last time at the door; tap for their faces (confirm, reject,
+ * add reference photos) so matching household faces stays easy. */
+export function HouseholdSection({ title }: { title: (text: React.ReactNode) => React.ReactNode }) {
+  const household = useHouseholdNames();
+  const subjects = useAvatars();
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <>
+      {title("Household")}
+      <div className="glass rise grid grid-cols-2 gap-2 rounded-[26px] p-3">
+        {household.map((n) => {
+          const s = subjects[`${HOUSEHOLD}${n}`];
+          return (
+            <button key={n} onClick={() => setOpen(n)} className="flex items-center gap-2.5 rounded-2xl p-2 text-left active:bg-chip">
+              {s?.sample ? (
+                <img src={s.sample} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[15px] font-semibold text-text-dim" style={{ background: "var(--chip-off)" }}>
+                  {n.charAt(0)}
+                </span>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-text">{n}</div>
+                <div className="truncate text-xs text-text-dim">
+                  {s ? `${s.n} ${s.n === 1 ? "face" : "faces"} · ${day(s.last)}` : "No faces yet"}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {open && (
+        <Sheet
+          title={open}
+          subtitle={`Household · ${subjects[`${HOUSEHOLD}${open}`]?.n ?? 0} faces`}
+          onClose={() => setOpen(null)}
+        >
+          <PersonFaces subject={`${HOUSEHOLD}${open}`} name={open} />
+        </Sheet>
+      )}
+    </>
+  );
+}

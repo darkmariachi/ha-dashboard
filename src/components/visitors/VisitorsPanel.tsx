@@ -20,7 +20,7 @@ import {
   type Visitor,
 } from "../../lib/visitors";
 import { Sheet } from "../home/Sheet";
-import { DeviceSuggestions, FaceReviewSection, PersonFaces } from "./Faces";
+import { DeviceSuggestions, FaceReviewSection, HouseholdSection, PersonFaces } from "./Faces";
 import { useAvatars, useFaceSeen } from "../../lib/useFaceNames";
 
 const HOME_GREEN = "#3ee08f";
@@ -208,6 +208,8 @@ export function VisitorsPanel() {
           </div>
         </>
       )}
+
+      <HouseholdSection title={(text) => <SectionTitle>{text}</SectionTitle>} />
 
       <FaceReviewSection log={log} onChanged={refresh} title={(text) => <SectionTitle>{text}</SectionTitle>} />
 

@@ -77,7 +77,9 @@ MAX_YAW = 55  # degrees; profiles don't match well
 # Frames per detection, as ms after it (on top of fetch_frame's +1 s):
 # people often aren't facing the doorbell yet when Protect first flags them.
 OFFSETS: dict[str, tuple[int, ...]] = {"camera.g4_doorbell_pro_medium": (0, 2000)}
-MATCH = 0.42  # cosine similarity to call it the same person
+MATCH = 0.45  # one labelled face this alike: auto-assign (strong match)
+MATCH_AGREE = 0.36  # or: the person's two most alike faces average this...
+MATCH_LEAD = 0.10  # ...and lead the next person by this (see best_match)
 NEAREST = 0.28  # below MATCH: only a "looks like" hint on an unnamed group
 CANDIDATE_MIN = 0.15  # per-visitor suggestions below this likeness are dropped
 CLUSTER = 0.50  # similarity that links two unlabelled faces in a cluster
@@ -204,16 +206,43 @@ def confirmed_matrix():
 
 
 def best_match(embs: np.ndarray, C, subjects):
-    """Per row of embs: (subject, score) of the closest labelled face, or
-    (None, score) below the threshold."""
+    """Per row of embs: (subject, score) it's auto-assigned to, or
+    (None, best score) when it isn't sure enough. Assigned when either
+      * one labelled face of a person is >= MATCH alike (a strong match), or
+      * the average of the person's two most alike faces is >= MATCH_AGREE
+        and leads every other person's by >= MATCH_LEAD (agreement).
+    Tuned on the household's own labelled faces (2026-11-07): 64 % of faces
+    named automatically, against 39 % for a single 0.42 threshold, which
+    also made 4 wrong matches. "ignore" only counts as a strong match, since
+    ignored faces are a mix of strangers that shouldn't vouch for each other."""
     if C is None or len(embs) == 0:
         return [(None, 0.0)] * len(embs)
     sims = embs @ C.T
-    idx = sims.argmax(axis=1)
+    subj = np.array(subjects)
+    names = sorted(set(subjects))
+    top1 = np.empty((len(embs), len(names)), dtype=np.float32)
+    top2 = np.empty_like(top1)
+    for k, s in enumerate(names):
+        cols = -np.sort(-sims[:, subj == s], axis=1)
+        top1[:, k] = cols[:, 0]
+        # One labelled face can't "agree" with itself: discount it.
+        top2[:, k] = cols[:, :2].mean(axis=1) if cols.shape[1] > 1 else cols[:, 0] * 0.95
+    agree = top2.copy()
+    if "ignore" in names:
+        agree[:, names.index("ignore")] = -1
     out = []
-    for i, j in enumerate(idx):
-        s = float(sims[i, j])
-        out.append((subjects[j] if s >= MATCH else None, s))
+    for i in range(len(embs)):
+        a = int(top1[i].argmax())
+        if top1[i, a] >= MATCH:
+            out.append((names[a], float(top1[i, a])))
+            continue
+        order = np.argsort(-agree[i])
+        b = int(order[0])
+        lead = agree[i, b] - (agree[i, order[1]] if len(order) > 1 else -1)
+        if agree[i, b] >= MATCH_AGREE and lead >= MATCH_LEAD:
+            out.append((names[b], float(agree[i, b])))
+        else:
+            out.append((None, float(top1[i, a])))
     return out
 
 
@@ -259,6 +288,7 @@ def fetch_frame(client: httpx.Client, camera: str, t: int) -> np.ndarray:
 
 def worker():
     load_model()
+    rematch_all()  # apply the current matching rule to everything stored
     if model is None:
         return
     client = httpx.Client()
