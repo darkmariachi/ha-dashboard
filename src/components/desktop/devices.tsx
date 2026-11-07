@@ -204,7 +204,7 @@ export function ServerPanel({ delay = 0 }: { delay?: number }) {
 
   const v = (id: string) => num(entities[id]);
   const swap = v(S.swap);
-  const temps = S.temps.filter((t) => entities[t.entityId]);
+  const temps = S.temps.filter((t) => num(entities[t.entityId]) !== null);
   const tUnit = unitOf(entities[S.temps[0].entityId]);
   const mib = (x: number | null) => (x === null ? "—" : x >= 1024 ? `${(x / 1024).toFixed(1)} GiB` : `${Math.round(x)} MiB`);
   const gib = (x: number | null) => (x === null ? "—" : x >= 1024 ? `${(x / 1024).toFixed(1)} TiB` : `${Math.round(x)} GiB`);
@@ -384,11 +384,14 @@ export function WorkstationPanel({ c, index }: { c: CuratedComputer; index: numb
         </div>
       )}
       <div className="mt-3 grid grid-cols-2 gap-x-5">
-        {c.facts.map((f) => (
-          <KV key={f.label} k={f.label} v={fact(f)} />
-        ))}
+        {c.facts
+          .filter((f) => live || fact(f) !== "—")
+          .map((f) => (
+            <KV key={f.label} k={f.label} v={fact(f)} />
+          ))}
         {(c.disks ?? []).map((d) => {
           const x = meterValue(d, entities);
+          if (x === null && !live) return null;
           return <KV key={d.entityId} k={`Disk ${d.label}`} v={x === null ? "—" : `${Math.round(x)}%`} color={x !== null && x >= 90 ? C.red : undefined} />;
         })}
         {badges.map((b) => (
@@ -529,7 +532,7 @@ export function NetworkConsole({ delay = 0 }: { delay?: number }) {
                 <Wifi size={11} className="mr-1 inline" />
                 {wireless} wireless
               </div>
-              <div className="dx-num">{wired} wired</div>
+              {wired > 0 && <div className="dx-num">{wired} wired</div>}
             </div>
           </div>
           <div className="flex h-2 overflow-hidden rounded-sm">
