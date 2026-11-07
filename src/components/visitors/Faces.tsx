@@ -41,6 +41,16 @@ function day(t: number) {
 function WhoSelect({ log, suggestion, busy, onPick }: { log: VisitLog; suggestion?: string; busy: boolean; onPick: (subject: string) => void }) {
   const household = useHouseholdNames();
   const [value, setValue] = useState(suggestion ?? "");
+  // Whatever is selected (e.g. a pre-selected hint) must be an option, or
+  // the menu shows "Who is this?" while Save would use the hidden value.
+  const known = new Set([
+    "",
+    NEW_VISITOR,
+    NEW_HOUSEHOLD,
+    IGNORE,
+    ...log.people.map((p) => p.id),
+    ...household.map((n) => `${HOUSEHOLD}${n}`),
+  ]);
   const [name, setName] = useState("");
   const naming = value === NEW_VISITOR || value === NEW_HOUSEHOLD;
 
@@ -62,6 +72,7 @@ function WhoSelect({ log, suggestion, busy, onPick }: { log: VisitLog; suggestio
         className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm text-text outline-none focus:border-accent"
       >
         <option value="">Who is this?</option>
+        {value && !known.has(value) && <option value={value}>{subjectName(value, log)}</option>}
         {log.people.length > 0 && (
           <optgroup label="Visitors">
             {log.people.map((p) => (

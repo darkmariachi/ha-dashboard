@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { HOUSEHOLD_PEOPLE } from "../config/curatedHome";
 import { useHa } from "../ha/HaProvider";
-import { faceSightings, faceSubjects, subjectName, type FaceSubject, type Sighting } from "./faces";
+import { faceSightings, faceSubjects, householdName, subjectName, type FaceSubject, type Sighting } from "./faces";
 import { fetchVisitLog, type VisitLog } from "./visitors";
 
 /**
@@ -46,38 +46,62 @@ export function useFaceNames(hours: number) {
   );
 }
 
-/** First names of the household's HA people, for the who-is-this pickers. */
-export function useHouseholdNames() {
-  const { entities } = useHa();
-  return HOUSEHOLD_PEOPLE.map((id) => ((entities[id]?.attributes.friendly_name as string | undefined) ?? id.split(".")[1]).split(" ")[0]);
-}
+/* ------------------------------------------- shared subject list (store) */
 
-const AVATARS_CHANGED = "faces:avatars-changed";
+// One /subjects fetch shared by every component on the page (pickers on
+// each face card, avatars in lists), refreshed every few minutes and when
+// avatarsChanged() fires.
+type Subjects = Record<string, FaceSubject>;
+let subjectsCache: Subjects = {};
+const listeners = new Set<(s: Subjects) => void>();
+let inflight: Promise<void> | null = null;
+let loadedAt = 0;
+
+function loadSubjects(force = false) {
+  if (inflight || (!force && Date.now() - loadedAt < 5 * 60_000)) return;
+  inflight = faceSubjects()
+    .then((list) => {
+      subjectsCache = Object.fromEntries(list.map((s) => [s.subject, s]));
+      loadedAt = Date.now();
+      listeners.forEach((l) => l(subjectsCache));
+    })
+    .catch(() => {})
+    .finally(() => {
+      inflight = null;
+    });
+}
 
 /** Tell every useAvatars on the page to reload (after choosing a picture or
  * naming faces). */
 export function avatarsChanged() {
-  window.dispatchEvent(new Event(AVATARS_CHANGED));
+  loadSubjects(true);
 }
 
-/** Profile pictures by subject (visitor id / household:Name), from the face
- * service; refreshed every few minutes and whenever avatarsChanged() fires. */
-export function useAvatars() {
-  const [subjects, setSubjects] = useState<Record<string, FaceSubject>>({});
+/** Profile pictures and counts by subject (visitor id / household:Name). */
+export function useAvatars(): Subjects {
+  const [subjects, setSubjects] = useState<Subjects>(subjectsCache);
   useEffect(() => {
-    let cancelled = false;
-    const load = () =>
-      faceSubjects()
-        .then((list) => !cancelled && setSubjects(Object.fromEntries(list.map((s) => [s.subject, s]))))
-        .catch(() => {});
-    load();
-    const t = setInterval(load, 5 * 60_000);
-    window.addEventListener(AVATARS_CHANGED, load);
+    listeners.add(setSubjects);
+    loadSubjects();
+    const t = setInterval(() => loadSubjects(), 5 * 60_000);
     return () => {
-      cancelled = true;
+      listeners.delete(setSubjects);
       clearInterval(t);
-      window.removeEventListener(AVATARS_CHANGED, load);
     };
   }, []);
   return subjects;
+}
+
+/** Household names for the who-is-this pickers: the HA people's first
+ * names, plus anyone already named as household in the face service
+ * (added with "Someone else in the household…"). */
+export function useHouseholdNames() {
+  const { entities } = useHa();
+  const subjects = useAvatars();
+  const names = HOUSEHOLD_PEOPLE.map((id) => ((entities[id]?.attributes.friendly_name as string | undefined) ?? id.split(".")[1]).split(" ")[0]);
+  for (const key of Object.keys(subjects)) {
+    const n = householdName(key);
+    if (n && !names.includes(n)) names.push(n);
+  }
+  return names;
 }

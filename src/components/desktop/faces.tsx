@@ -49,6 +49,16 @@ function WhoPicker({
 }) {
   const household = useHouseholdNames();
   const [value, setValue] = useState(suggestion ?? "");
+  // Whatever is selected (e.g. a pre-selected hint) must be an option, or
+  // the menu shows "Who is this?" while Save would use the hidden value.
+  const known = new Set([
+    "",
+    NEW_VISITOR,
+    NEW_HOUSEHOLD,
+    IGNORE,
+    ...log.people.map((p) => p.id),
+    ...household.map((n) => `${HOUSEHOLD}${n}`),
+  ]);
   const [name, setName] = useState("");
   const naming = value === NEW_VISITOR || value === NEW_HOUSEHOLD;
 
@@ -70,6 +80,7 @@ function WhoPicker({
         className="rounded-md border border-dx-line bg-dx-raise px-2 py-1 text-[11.5px] text-dx-text outline-none focus:border-dx-cyan/60"
       >
         <option value="">Who is this?</option>
+        {value && !known.has(value) && <option value={value}>{subjectName(value, log)}</option>}
         {log.people.length > 0 && (
           <optgroup label="Visitors">
             {log.people.map((p) => (
