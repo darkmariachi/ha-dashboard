@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, X } from "lucide-react";
+import { Check, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, Wifi, X } from "lucide-react";
 import {
   HOUSEHOLD,
   IGNORE,
@@ -8,18 +8,21 @@ import {
   camLabel,
   faceClusters,
   faceStatus,
+  faceCandidates,
   facesOf,
+  rejectFaces,
   setAvatar,
   subjectName,
   suggestFor,
   uploadPhotos,
+  type Candidate,
   type Face,
   type FaceCluster,
   type FaceStatus,
 } from "../../lib/faces";
 import { avatarsChanged, useAvatars, useHouseholdNames } from "../../lib/useFaceNames";
 import { useNow } from "../../lib/useNow";
-import { saveVisitor, type VisitLog } from "../../lib/visitors";
+import { saveVisitor, type Session, type VisitLog } from "../../lib/visitors";
 import { dur } from "./data";
 import { Btn, C, Dot, Label, Panel } from "./ui";
 
@@ -277,9 +280,93 @@ export function FaceReview({ log, onChanged }: { log: VisitLog; onChanged: () =>
 
 /* ------------------------------------------------------ visitor gallery */
 
+/** Unnamed faces from while this visitor's phone was on the Wi-Fi, most
+ * like them first: select, then confirm or reject. */
+function VisitSuggestions({ subject, name, visits, onChanged }: { subject: string; name: string; visits: Session[]; onChanged: () => void }) {
+  const [list, setList] = useState<Candidate[] | null>(null);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const first = name.split(" ")[0];
+  const visitsKey = visits.map((v) => `${v.start}-${v.end}`).join(",");
+
+  const load = useCallback(() => {
+    faceCandidates(subject, visits, Date.now())
+      .then(setList)
+      .catch(() => setList([]));
+    // visitsKey stands in for visits (a new array every render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, visitsKey]);
+  useEffect(load, [load]);
+
+  if (!list || list.length === 0) return null;
+
+  async function answer(yes: boolean) {
+    const ids = [...picked];
+    setBusy(true);
+    await (yes ? assignFaces(ids, subject) : rejectFaces(subject, ids)).catch(() => {});
+    setPicked(new Set());
+    setBusy(false);
+    avatarsChanged();
+    load();
+    onChanged();
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-dashed border-dx-green/40 bg-dx-green/[0.03] p-2.5">
+      <div className="mb-2 flex items-center gap-2">
+        <Wifi size={12} className="text-dx-green" />
+        <Label className="flex-1 text-dx-green">
+          Seen while {first}'s phone was here · {list.length}
+          {list.some((f) => f.sim !== null) && <span className="ml-1.5 normal-case tracking-normal text-dx-faint">most alike first</span>}
+        </Label>
+        <button
+          onClick={() => setPicked(picked.size === list.length ? new Set() : new Set(list.map((f) => f.id)))}
+          className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-dx-dim hover:text-dx-text"
+        >
+          {picked.size === list.length ? "Clear" : "Select all"}
+        </button>
+        <Btn color={C.green} disabled={busy || picked.size === 0} onClick={() => answer(true)}>
+          {busy ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} It's {first}
+          {picked.size > 0 && ` (${picked.size})`}
+        </Btn>
+        <Btn disabled={busy || picked.size === 0} onClick={() => answer(false)}>
+          <X size={11} /> Not {first}
+        </Btn>
+      </div>
+      <div className="dx-scroll grid max-h-[200px] grid-cols-10 gap-1 overflow-y-auto pr-1">
+        {list.map((f) => {
+          const on = picked.has(f.id);
+          return (
+            <button
+              key={f.id}
+              onClick={() =>
+                setPicked((s) => {
+                  const n = new Set(s);
+                  if (n.has(f.id)) n.delete(f.id);
+                  else n.add(f.id);
+                  return n;
+                })
+              }
+              title={`${camLabel(f.camera)} · ${when(f.t)}${f.sim !== null ? ` · ${Math.round(f.sim * 100)}% like ${first}` : ""}`}
+              className="relative aspect-square overflow-hidden rounded-[4px] border bg-black"
+              style={{ borderColor: on ? C.green : "rgba(255,255,255,0.08)", boxShadow: on ? `0 0 8px ${C.green}` : undefined }}
+            >
+              <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", !on && picked.size > 0 && "opacity-60")} />
+              {f.sim !== null && (
+                <span className="dx-num absolute bottom-0 right-0 bg-black/70 px-0.5 text-[9px] text-dx-text">{Math.round(f.sim * 100)}</span>
+              )}
+              {on && <Check size={12} className="absolute left-0.5 top-0.5 rounded-full bg-dx-green p-px text-black" />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** A person's faces: confirmed ones solid, auto-matched ones dashed with
  * confirm / reject, plus reference photo upload. */
-export function SubjectFaces({ subject, name, color }: { subject: string; name: string; color: string }) {
+export function SubjectFaces({ subject, name, color, visits = [] }: { subject: string; name: string; color: string; visits?: Session[] }) {
   const avatar = useAvatars()[subject];
   const now = useNow(60_000).getTime();
   const [faces, setFaces] = useState<Face[] | null>(null);
@@ -389,6 +476,7 @@ export function SubjectFaces({ subject, name, color }: { subject: string; name: 
         </div>
       )}
       {message && <div className="mt-1.5 text-[10.5px] text-dx-dim">{message}</div>}
+      {visits.length > 0 && <VisitSuggestions subject={subject} name={name} visits={visits} onChanged={load} />}
     </div>
   );
 }

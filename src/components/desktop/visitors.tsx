@@ -326,7 +326,7 @@ function VisitorDetail({
       </div>
 
       <div className="mt-4">
-        <SubjectFaces subject={person.id} name={person.name} color={color} />
+        <SubjectFaces subject={person.id} name={person.name} color={color} visits={visits} />
       </div>
 
       <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">

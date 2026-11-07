@@ -8,18 +8,21 @@ import {
   camLabel,
   faceClusters,
   faceStatus,
+  faceCandidates,
   facesOf,
+  rejectFaces,
   setAvatar,
   subjectName,
   suggestFor,
   uploadPhotos,
+  type Candidate,
   type Face,
   type FaceCluster,
   type FaceStatus,
 } from "../../lib/faces";
 import { avatarsChanged, useAvatars, useHouseholdNames } from "../../lib/useFaceNames";
 import { useNow } from "../../lib/useNow";
-import { saveVisitor, type VisitLog } from "../../lib/visitors";
+import { saveVisitor, type Session, type VisitLog } from "../../lib/visitors";
 
 // Touch versions of the desktop face tools, in the phone / tablet glass
 // style: name the unknown face groups the face service found, and see /
@@ -255,9 +258,116 @@ export function FaceReviewSection({ log, onChanged, title }: { log: VisitLog; on
   );
 }
 
+/** Unnamed faces from while this visitor's phone was on the Wi-Fi, best
+ * likeness first: tap to pick, then say whether it's them. */
+function VisitSuggestions({ subject, name, visits, onChanged }: { subject: string; name: string; visits: Session[]; onChanged: () => void }) {
+  const [list, setList] = useState<Candidate[] | null>(null);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const first = name.split(" ")[0];
+  const visitsKey = visits.map((v) => `${v.start}-${v.end}`).join(",");
+
+  const load = useCallback(() => {
+    faceCandidates(subject, visits, Date.now())
+      .then(setList)
+      .catch(() => setList([]));
+    // visitsKey stands in for visits (a new array every render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, visitsKey]);
+  useEffect(load, [load]);
+
+  if (!list || list.length === 0) return null;
+
+  async function answer(yes: boolean) {
+    const ids = [...picked];
+    setBusy(true);
+    await (yes ? assignFaces(ids, subject) : rejectFaces(subject, ids)).catch(() => {});
+    navigator.vibrate?.(10);
+    setPicked(new Set());
+    setBusy(false);
+    avatarsChanged();
+    load();
+    onChanged();
+  }
+
+  const toggle = (id: number) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-2xl bg-chip p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-text">
+          <Wifi size={14} style={{ color: HOME_GREEN }} /> While {first}'s phone was here · {list.length}
+        </div>
+        <button
+          onClick={() => setPicked(picked.size === list.length ? new Set() : new Set(list.map((f) => f.id)))}
+          className="text-xs font-semibold"
+          style={{ color: ACCENT }}
+        >
+          {picked.size === list.length ? "Clear" : "Select all"}
+        </button>
+      </div>
+      <p className="text-xs text-text-dim">
+        Unnamed faces from the front door during {first}'s visits
+        {list.some((f) => f.sim !== null) ? ", most like them first" : ""}. Tap the ones that are {first}.
+      </p>
+      <div className="grid grid-cols-4 gap-1.5">
+        {list.map((f) => {
+          const on = picked.has(f.id);
+          return (
+            <button
+              key={f.id}
+              onClick={() => toggle(f.id)}
+              aria-pressed={on}
+              className={clsx("relative aspect-square overflow-hidden rounded-xl bg-black/40", on && "ring-[3px]")}
+              style={on ? ({ "--tw-ring-color": HOME_GREEN } as React.CSSProperties) : undefined}
+            >
+              <img src={f.crop} alt="" className="h-full w-full object-cover" />
+              <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-[9.5px] font-semibold text-white">
+                {day(f.t)}
+                {f.sim !== null && ` · ${Math.round(f.sim * 100)}%`}
+              </span>
+              {on && (
+                <span className="absolute right-1 top-1 rounded-full p-0.5" style={{ background: HOME_GREEN }}>
+                  <Check size={12} className="text-white" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {picked.size > 0 && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => answer(true)}
+            disabled={busy}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-white active:scale-95 disabled:opacity-50"
+            style={{ background: HOME_GREEN }}
+          >
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} It's {first} ({picked.size})
+          </button>
+          <button
+            onClick={() => answer(false)}
+            disabled={busy}
+            className="flex-1 rounded-full bg-surface py-2.5 text-sm font-semibold text-[#ff6b6b] active:scale-95 disabled:opacity-50"
+          >
+            Not {first}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A visitor's faces in their sheet: confirm or reject automatic matches,
- * and add reference photos from the camera roll. */
-export function PersonFaces({ subject, name }: { subject: string; name: string }) {
+ * add reference photos from the camera roll, and pick from faces seen
+ * while their phone was on the Wi-Fi. */
+export function PersonFaces({ subject, name, visits = [] }: { subject: string; name: string; visits?: Session[] }) {
   const avatar = useAvatars()[subject];
   const [faces, setFaces] = useState<Face[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -368,6 +478,7 @@ export function PersonFaces({ subject, name }: { subject: string; name: string }
           )}
         </div>
       )}
+      {visits.length > 0 && <VisitSuggestions subject={subject} name={name} visits={visits} onChanged={load} />}
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => upload(e.target.files).finally(() => (e.target.value = ""))} />
       <button
         onClick={() => file.current?.click()}

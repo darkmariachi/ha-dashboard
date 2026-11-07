@@ -25,6 +25,8 @@ Assistant token as a Bearer header, checked against HA):
   POST /assign   {ids: [..], subject: str | null}
   POST /enroll   {subject, image: data URL}   reference photo upload
   POST /avatar   {subject, id | null}         choose / clear a profile picture
+  POST /candidates {subject, windows: [[start, end]...]}  unnamed faces from those times
+  POST /reject   {subject, ids}               "not them": stop suggesting these
 """
 
 from __future__ import annotations
@@ -104,6 +106,7 @@ db.executescript(
     create index if not exists faces_subject on faces(subject);
     create index if not exists faces_t on faces(t);
     create table if not exists avatars (subject text primary key, face_id integer not null);
+    create table if not exists rejections (subject text not null, face_id integer not null, primary key (subject, face_id));
     """
 )
 
@@ -213,8 +216,11 @@ def rematch_all():
         rows = db.execute("select id, emb from faces where label is null or label = 'auto'").fetchall()
         if not rows:
             return
+        rejected = {(r[0], r[1]) for r in db.execute("select subject, face_id from rejections")}
         E = np.stack([np.frombuffer(r["emb"], dtype=np.float32) for r in rows])
         for r, (subj, score) in zip(rows, best_match(E, C, subjects)):
+            if subj and (subj, r["id"]) in rejected:
+                subj = None  # someone said it isn't them
             db.execute(
                 "update faces set subject = ?, label = ?, score = ? where id = ?",
                 (subj, "auto" if subj else None, score, r["id"]),
@@ -485,6 +491,60 @@ async def subjects(request: Request):
                 }
             )
     return out
+
+
+@app.post("/candidates")
+async def candidates(request: Request):
+    """Unnamed faces seen while a visitor was around: `windows` are
+    [start, end] ms ranges (the dashboard sends their Wi-Fi visits, padded).
+    Each comes with `sim`, its best likeness to the subject's confirmed
+    faces (null when there are none yet); best first. Faces someone already
+    said aren't this subject are left out."""
+    await require_ha_token(request)
+    body = await request.json()
+    subject = body.get("subject")
+    windows = [(int(a), int(b)) for a, b in (body.get("windows") or [])][:500]
+    if not isinstance(subject, str) or not subject or not windows:
+        return []
+    clause = " or ".join(["(t between ? and ?)"] * len(windows))
+    params = [v for w in windows for v in w]
+    with db_lock:
+        rows = db.execute(
+            f"select * from faces where subject is null and camera != 'upload' and ({clause})"
+            " and id not in (select face_id from rejections where subject = ?)",
+            (*params, subject),
+        ).fetchall()
+        mine = db.execute("select emb from faces where subject = ? and label = 'confirmed'", (subject,)).fetchall()
+    if not rows:
+        return []
+    sims = [None] * len(rows)
+    if mine:
+        M = np.stack([np.frombuffer(r["emb"], dtype=np.float32) for r in mine])
+        E = np.stack([np.frombuffer(r["emb"], dtype=np.float32) for r in rows])
+        sims = (E @ M.T).max(axis=1).tolist()
+    out = [{**face_json(r), "sim": None if s is None else round(float(s), 3)} for r, s in zip(rows, sims)]
+    out.sort(key=lambda f: (f["sim"] if f["sim"] is not None else -1, f["t"]), reverse=True)
+    return out[: int(body.get("limit", 60))]
+
+
+@app.post("/reject")
+async def reject(request: Request):
+    """Mark faces as not this subject, so they stop being suggested (and
+    drop an automatic match to them if there was one)."""
+    await require_ha_token(request)
+    body = await request.json()
+    subject = body.get("subject")
+    ids = [int(i) for i in body.get("ids", [])][:1000]
+    if not isinstance(subject, str) or not subject:
+        raise HTTPException(400, "subject required")
+    with db_lock:
+        db.executemany("insert or ignore into rejections(subject, face_id) values (?, ?)", [(subject, i) for i in ids])
+        db.executemany(
+            "update faces set subject = null, label = null, score = 0 where id = ? and subject = ? and label = 'auto'",
+            [(i, subject) for i in ids],
+        )
+        db.commit()
+    return {"ok": True}
 
 
 @app.post("/avatar")

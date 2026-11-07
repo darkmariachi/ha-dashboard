@@ -373,7 +373,7 @@ function PersonSheet({
       }
       onClose={onClose}
     >
-      <PersonFaces subject={person.id} name={person.name} />
+      <PersonFaces subject={person.id} name={person.name} visits={visits} />
 
       <VisitHistory visits={visits} now={now} limit={20} />
 

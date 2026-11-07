@@ -1,5 +1,5 @@
 import { token } from "./push";
-import { visitsOf, type VisitLog } from "./visitors";
+import { visitsOf, type Session, type VisitLog } from "./visitors";
 
 // Client for the face recognition service (faces/app.py), proxied by nginx
 // at /api/faces/. Every call carries the signed-in HA token.
@@ -84,6 +84,20 @@ export const faceSightings = (since: number) => call<Sighting[]>(`sightings?sinc
 export const assignFaces = (ids: number[], subject: string | null) => call<{ ok: true }>("assign", { ids, subject });
 export const enrollFace = (subject: string, image: string) => call<{ ok: true; faces_in_photo: number }>("enroll", { subject, image });
 export const setAvatar = (subject: string, id: number | null) => call<{ ok: true }>("avatar", { subject, id });
+export const rejectFaces = (subject: string, ids: number[]) => call<{ ok: true }>("reject", { subject, ids });
+
+/** An unnamed face from while a visitor was around; `sim` is how much it
+ * resembles their confirmed faces (null when they have none yet). */
+export interface Candidate extends Face {
+  sim: number | null;
+}
+
+/** Unnamed faces from a visitor's Wi-Fi visits (padded like the cluster
+ * hints: 20 min before joining, 5 min after leaving), best match first. */
+export function faceCandidates(subject: string, visits: Session[], now: number) {
+  const windows = visits.slice(0, 200).map((v) => [v.start - BEFORE_JOIN, (v.end ?? now) + AFTER_LEAVE]);
+  return windows.length ? call<Candidate[]>("candidates", { subject, windows, limit: 60 }) : Promise.resolve([]);
+}
 
 /** "household:Andy" -> "Andy"; visitor ids are resolved by the caller. */
 export function householdName(subject: string) {
