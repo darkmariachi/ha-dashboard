@@ -111,9 +111,9 @@ export const faceStats = () => call<FaceStats>("stats");
 
 /** A queue error in plain words (they're raw HTTP errors with long URLs). */
 export function frameError(error: string) {
-  if (/404/.test(error)) return "Protect had no recording at that moment";
+  if (/\b404\b/.test(error)) return "Protect had no recording at that moment";
   if (/timed? ?out/i.test(error)) return "Protect took too long to answer";
-  if (/5\d\d/.test(error)) return "Home Assistant or Protect returned an error";
+  if (/\b5\d\d\b/.test(error)) return "Home Assistant or Protect returned an error";
   return error.slice(0, 90);
 }
 
