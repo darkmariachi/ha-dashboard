@@ -27,6 +27,8 @@ Assistant token as a Bearer header, checked against HA):
   POST /avatar   {subject, id | null}         choose / clear a profile picture
   POST /candidates {subject, windows: [[start, end]...]}  unnamed faces from those times
   POST /reject   {subject, ids}               "not them": stop suggesting these
+  POST /delete   {ids}                        delete bad captures outright
+  GET  /stats                                 queue / throughput / CPU for Insights
 """
 
 from __future__ import annotations
@@ -109,6 +111,10 @@ db.executescript(
     create table if not exists rejections (subject text not null, face_id integer not null, primary key (subject, face_id));
     """
 )
+# When an item was queued (for live-detection delay); added after launch.
+if "created" not in {r[1] for r in db.execute("pragma table_info(queue)")}:
+    db.execute("alter table queue add column created integer")
+    db.commit()
 
 
 def now_ms() -> int:
@@ -121,8 +127,8 @@ def enqueue(camera: str, t: int, kind: str, prio: int) -> bool:
     key = f"{camera}|{t // 2000}"
     with db_lock:
         cur = db.execute(
-            "insert or ignore into queue(key, camera, t, kind, prio, updated) values (?,?,?,?,?,?)",
-            (key, camera, t, kind, prio, now_ms()),
+            "insert or ignore into queue(key, camera, t, kind, prio, updated, created) values (?,?,?,?,?,?,?)",
+            (key, camera, t, kind, prio, now_ms(), now_ms()),
         )
         db.commit()
         return cur.rowcount > 0
@@ -394,6 +400,133 @@ async def status(request: Request):
         "faces": dict(f),
         "processing": worker_state["current"],
     }
+
+
+_cpu_sample: dict[str, float] = {}
+
+
+def cpu_usage() -> dict:
+    """This container's CPU use (cores) since the last call, and its limit,
+    from cgroup v2. Empty if the files aren't there."""
+    try:
+        usec = next(int(l.split()[1]) for l in open("/sys/fs/cgroup/cpu.stat") if l.startswith("usage_usec"))
+        quota, period = open("/sys/fs/cgroup/cpu.max").read().split()
+    except (OSError, StopIteration, ValueError):
+        return {}
+    now = time.monotonic()
+    prev = _cpu_sample.get("usec"), _cpu_sample.get("at")
+    if prev[0] is None:  # first call: take a short sample
+        time.sleep(0.5)
+        later = time.monotonic()
+        usec2 = next(int(l.split()[1]) for l in open("/sys/fs/cgroup/cpu.stat") if l.startswith("usage_usec"))
+        cores = (usec2 - usec) / 1e6 / (later - now)
+        usec, now = usec2, later
+    else:
+        cores = (usec - prev[0]) / 1e6 / max(1e-3, now - prev[1])
+    _cpu_sample.update(usec=usec, at=now)
+    limit = None if quota == "max" else int(quota) / int(period)
+    return {"cores": round(cores, 2), "limit": limit, "host_cores": os.cpu_count()}
+
+
+@app.get("/stats")
+async def stats(request: Request):
+    """Everything the Insights "face scanning" dashboard shows."""
+    await require_ha_token(request)
+    now = now_ms()
+    hour, day = 3600_000, 86_400_000
+    with db_lock:
+        by = {
+            (r["prio"], r["status"]): r["n"]
+            for r in db.execute("select prio, status, count(*) n from queue group by prio, status")
+        }
+        hourly = {
+            r["h"]: (r["n"], r["faces"] or 0)
+            for r in db.execute(
+                "select (? - updated) / ? h, count(*) n, sum(faces) faces from queue"
+                " where status = 'done' and updated > ? group by h",
+                (now, hour, now - day),
+            )
+        }
+        live = db.execute(
+            "select count(*) n, avg(updated - created) delay, max(updated) last from queue"
+            " where prio > 0 and status = 'done' and created is not null and updated > ?",
+            (now - day,),
+        ).fetchone()
+        last_live = db.execute("select max(t) from queue where prio > 0").fetchone()[0]
+        current = db.execute("select camera, t, kind, prio from queue where key = ?", (worker_state["current"] or "",)).fetchone()
+        next_up = db.execute(
+            "select camera, t, prio from queue where status = 'pending' order by prio desc, t desc limit 1"
+        ).fetchone()
+        oldest_pending = db.execute("select min(t) from queue where status = 'pending' and prio = 0").fetchone()[0]
+        errors = [
+            dict(r)
+            for r in db.execute(
+                "select camera, t, error, updated from queue where status = 'failed' order by updated desc limit 5"
+            )
+        ]
+        f = db.execute(
+            "select count(*) n, sum(subject is null) unknown, sum(label = 'confirmed' and subject != 'ignore') confirmed,"
+            " sum(label = 'auto' and subject != 'ignore') auto, sum(subject = 'ignore') ignored, min(t) first, max(t) last"
+            " from faces where camera != 'upload'"
+        ).fetchone()
+        per_day = [
+            dict(r)
+            for r in db.execute(
+                "select date(t / 1000, 'unixepoch', 'localtime') d, count(*) n from faces"
+                " where camera != 'upload' and t > ? group by d order by d",
+                (now - 30 * day,),
+            )
+        ]
+    done = sum(v for (p, s), v in by.items() if s == "done")
+    pending = sum(v for (p, s), v in by.items() if s == "pending")
+    failed = sum(v for (p, s), v in by.items() if s == "failed")
+    last_hour = hourly.get(0, (0, 0))[0]
+    return {
+        "model": "ready" if model else ("error: " + model_error if model_error else "loading"),
+        "now": now,
+        "queue": {"done": done, "pending": pending, "failed": failed},
+        "backfill": {
+            "done": by.get((0, "done"), 0),
+            "pending": by.get((0, "pending"), 0),
+            "failed": by.get((0, "failed"), 0),
+            "oldest_pending": oldest_pending,
+        },
+        "live": {
+            "queued_ever": sum(v for (p, s), v in by.items() if p > 0),
+            "done_24h": live["n"],
+            "avg_delay_ms": live["delay"],
+            "last_detection": last_live,
+        },
+        # Index 0 = the last hour, 23 = a day ago: [frames, faces].
+        "hourly": [list(hourly.get(h, (0, 0))) for h in range(24)],
+        "rate_per_hour": last_hour,
+        "eta_ms": round(pending / last_hour * hour) if last_hour and pending else None,
+        "current": dict(current) if current else None,
+        "next": dict(next_up) if next_up else None,
+        "errors": errors,
+        "faces": dict(f),
+        "faces_per_day": per_day,
+        "cpu": await asyncio.to_thread(cpu_usage),
+        "thresholds": {"det": MIN_DET, "size": MIN_SIZE, "yaw": MAX_YAW, "match": MATCH},
+    }
+
+
+@app.post("/delete")
+async def delete_faces(request: Request):
+    """Delete faces outright (bad captures): gone from the library, so they
+    can't match or be matched. The camera recording isn't touched."""
+    await require_ha_token(request)
+    ids = [int(i) for i in (await request.json()).get("ids", [])][:500]
+    if not ids:
+        return {"ok": True, "deleted": 0}
+    marks = ",".join("?" * len(ids))
+    with db_lock:
+        cur = db.execute(f"delete from faces where id in ({marks})", ids)
+        db.execute(f"delete from avatars where face_id in ({marks})", ids)
+        db.execute(f"delete from rejections where face_id in ({marks})", ids)
+        db.commit()
+    await asyncio.to_thread(rematch_all)
+    return {"ok": True, "deleted": cur.rowcount}
 
 
 @app.get("/clusters")

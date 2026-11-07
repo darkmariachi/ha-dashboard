@@ -4,6 +4,7 @@ import { useHa } from "../../ha/HaProvider";
 import { isNightFor } from "../../lib/weatherTheme";
 import { GamingCard } from "../devices/GamingCard";
 import { WeatherBackground } from "../home/WeatherBackground";
+import { FaceScanCard } from "./FaceScanCard";
 import { LightsInsightCard } from "./LightsInsightCard";
 import { PresenceInsightCard } from "./PresenceInsightCard";
 
@@ -11,9 +12,10 @@ import { PresenceInsightCard } from "./PresenceInsightCard";
 export function InsightsColumn() {
   return (
     <div className="flex flex-col gap-3">
-      <PresenceInsightCard />
-      <LightsInsightCard index={1} />
-      <GamingCard index={2} />
+      <FaceScanCard />
+      <PresenceInsightCard index={1} />
+      <LightsInsightCard index={2} />
+      <GamingCard index={3} />
     </div>
   );
 }
@@ -42,7 +44,8 @@ export function InsightsPage() {
               <PresenceInsightCard />
               <GamingCard index={2} />
             </div>
-            <div className="lg:flex-1">
+            <div className="flex flex-col gap-4 lg:flex-1">
+              <FaceScanCard index={3} />
               <LightsInsightCard index={1} />
             </div>
           </div>

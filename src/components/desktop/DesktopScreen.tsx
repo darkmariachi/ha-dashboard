@@ -29,6 +29,7 @@ import { weatherIcon } from "../home/statusIcons";
 import { DetectionsPanel, EnergyBreakdown, IndoorPanel, LightsPanel, PresencePanel } from "./analysis";
 import { DevicesSummary, FleetTable, NetworkConsole, NotifyPanel, ScreenTimePanel, ServerPanel, WorkstationPanel } from "./devices";
 import { VisitorsConsole } from "./visitors";
+import { FaceScanPanel } from "./faceScan";
 import { ClimatePanel, OnNowPanel, RoomPanel, RoomsMatrix, SprinklerPanel, TvPanel, VacuumPanel } from "./control";
 import { useIssues, useOpenings } from "./data";
 import {
@@ -185,12 +186,13 @@ function Devices() {
 function Insights() {
   return (
     <>
+      <FaceScanPanel />
       <div className="grid items-start gap-3 xl:grid-cols-12">
         <div className="xl:col-span-7">
-          <PresencePanel />
+          <PresencePanel delay={60} />
         </div>
         <div className="xl:col-span-5">
-          <LightsPanel delay={60} />
+          <LightsPanel delay={100} />
         </div>
       </div>
       <GamingCard index={2} />

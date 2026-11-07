@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, Wifi, X } from "lucide-react";
+import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, StarOff, Trash2, Wifi, X } from "lucide-react";
+import { DeleteFaceSheet, FaceViewer } from "../visitors/FaceViewer";
 import { Sheet } from "../home/Sheet";
 import {
   HOUSEHOLD,
   IGNORE,
   assignFaces,
   camLabel,
+  deleteFaces,
   faceClusters,
   faceStatus,
   faceCandidates,
@@ -135,6 +137,8 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmIgnore, setConfirmIgnore] = useState(false);
+  const [viewing, setViewing] = useState<Face | null>(null);
+  const [deleting, setDeleting] = useState<Face | null>(null);
   const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
   const looks = cluster.nearest && cluster.nearest.subject !== hint?.id ? cluster.nearest : null;
   const first = cluster.times[0];
@@ -163,25 +167,65 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
         {cluster.faces.map((f) => {
           const out = excluded.has(f.id);
           return (
-            <button
-              key={f.id}
-              onClick={() =>
-                setExcluded((s) => {
-                  const n = new Set(s);
-                  if (n.has(f.id)) n.delete(f.id);
-                  else n.add(f.id);
-                  return n;
-                })
-              }
-              title={`${camLabel(f.camera)} · ${when(f.t)}${out ? " · left out" : " · click to leave this one out"}`}
-              className="relative aspect-square overflow-hidden rounded-[4px] bg-black"
-            >
-              <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", out && "opacity-25 grayscale")} />
-              {out && <X size={16} className="absolute inset-0 m-auto text-dx-red" />}
-            </button>
+            <div key={f.id} className="group relative aspect-square">
+              <button
+                onClick={() => setViewing(f)}
+                title={`${camLabel(f.camera)} · ${when(f.t)}${out ? " · left out of the group" : ""} · click to see it up close`}
+                className="h-full w-full overflow-hidden rounded-[4px] bg-black"
+              >
+                <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", out && "opacity-25 grayscale")} />
+                {out && <span className="absolute inset-x-0 bottom-0 bg-black/70 text-center text-[9px] font-semibold uppercase text-dx-dim">left out</span>}
+              </button>
+              <button
+                onClick={() => setDeleting(f)}
+                title="Delete this face"
+                className="absolute right-0.5 top-0.5 hidden h-4 w-4 items-center justify-center rounded-full bg-black/80 text-dx-text hover:text-dx-red group-hover:flex"
+              >
+                <X size={10} strokeWidth={2.5} />
+              </button>
+            </div>
           );
         })}
       </div>
+      {viewing && (
+        <FaceViewer face={viewing} onClose={() => setViewing(null)}>
+          <Btn
+            onClick={() => {
+              setExcluded((s) => {
+                const n = new Set(s);
+                if (n.has(viewing.id)) n.delete(viewing.id);
+                else n.add(viewing.id);
+                return n;
+              });
+              setViewing(null);
+            }}
+          >
+            {excluded.has(viewing.id) ? "Put back in the group" : "Leave out of this group"}
+          </Btn>
+          <Btn
+            color={C.red}
+            onClick={() => {
+              setDeleting(viewing);
+              setViewing(null);
+            }}
+          >
+            <Trash2 size={11} /> Delete
+          </Btn>
+        </FaceViewer>
+      )}
+      {deleting && (
+        <DeleteFaceSheet
+          face={deleting}
+          onClose={() => setDeleting(null)}
+          onConfirm={async () => {
+            const id = deleting.id;
+            setDeleting(null);
+            await deleteFaces([id]).catch((e: Error) => setError(e.message));
+            avatarsChanged();
+            onDone();
+          }}
+        />
+      )}
       <div className="dx-num flex flex-wrap items-center gap-x-2 text-[10.5px] text-dx-dim">
         <span className="text-dx-text">{cluster.ids.length}×</span>
         <span>{days} {days === 1 ? "day" : "days"}</span>

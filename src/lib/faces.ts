@@ -1,4 +1,5 @@
 import { token } from "./push";
+import { PROTECT_ENTRY_ID } from "../config/cameraFeed";
 import { visitsOf, type Session, type VisitLog } from "./visitors";
 
 // Client for the face recognition service (faces/app.py), proxied by nginx
@@ -85,6 +86,37 @@ export const assignFaces = (ids: number[], subject: string | null) => call<{ ok:
 export const enrollFace = (subject: string, image: string) => call<{ ok: true; faces_in_photo: number }>("enroll", { subject, image });
 export const setAvatar = (subject: string, id: number | null) => call<{ ok: true }>("avatar", { subject, id });
 export const rejectFaces = (subject: string, ids: number[]) => call<{ ok: true }>("reject", { subject, ids });
+/** Delete faces outright (bad captures). The recording isn't touched. */
+export const deleteFaces = (ids: number[]) => call<{ ok: true; deleted: number }>("delete", { ids });
+
+export interface FaceStats {
+  model: string;
+  now: number;
+  queue: { done: number; pending: number; failed: number };
+  backfill: { done: number; pending: number; failed: number; oldest_pending: number | null };
+  live: { queued_ever: number; done_24h: number; avg_delay_ms: number | null; last_detection: number | null };
+  /** [frames, faces] per hour; index 0 is the last hour. */
+  hourly: [number, number][];
+  rate_per_hour: number;
+  eta_ms: number | null;
+  current: { camera: string; t: number; kind: string; prio: number } | null;
+  next: { camera: string; t: number; prio: number } | null;
+  errors: { camera: string; t: number; error: string; updated: number }[];
+  faces: { n: number; unknown: number | null; confirmed: number | null; auto: number | null; ignored: number | null; first: number | null; last: number | null };
+  faces_per_day: { d: string; n: number }[];
+  cpu: { cores?: number; limit?: number | null; host_cores?: number };
+  thresholds: { det: number; size: number; yaw: number; match: number };
+}
+export const faceStats = () => call<FaceStats>("stats");
+
+/** HA path of the full camera frame a face was cut from (the service
+ * looked at the detection time + 1 s); null for uploaded photos. Sign it
+ * with HA (SignedImg) to show it. */
+export function framePath(f: Pick<Face, "camera" | "t">, width = 1280) {
+  if (f.camera === "upload") return null;
+  const iso = new Date(Math.round((f.t + 1000) / 1000) * 1000).toISOString().replace(".000Z", "Z");
+  return `/api/unifiprotect/snapshot/${PROTECT_ENTRY_ID}/${f.camera}/${iso}?width=${width}`;
+}
 
 /** An unnamed face from while a visitor was around; `sim` is how much it
  * resembles their confirmed faces (null when they have none yet). */

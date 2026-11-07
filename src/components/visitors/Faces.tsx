@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, Wifi, X } from "lucide-react";
+import { Check, EyeOff, ImagePlus, Loader2, ScanFace, Sparkles, Star, Trash2, Wifi, X } from "lucide-react";
+import { DeleteFaceSheet, FaceViewer } from "./FaceViewer";
 import { Sheet } from "../home/Sheet";
 import {
   HOUSEHOLD,
   IGNORE,
   assignFaces,
   camLabel,
+  deleteFaces,
   faceClusters,
   faceStatus,
   faceCandidates,
@@ -170,6 +172,8 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmIgnore, setConfirmIgnore] = useState(false);
+  const [viewing, setViewing] = useState<Face | null>(null);
+  const [deleting, setDeleting] = useState<Face | null>(null);
   const hint = useMemo(() => suggestFor(cluster, log, now), [cluster, log, now]);
   const looks = cluster.nearest && cluster.nearest.subject !== hint?.id ? cluster.nearest : null;
   const days = new Set(cluster.times.map((t) => new Date(t).toDateString())).size;
@@ -199,22 +203,25 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
         {cluster.faces.slice(0, 8).map((f) => {
           const out = excluded.has(f.id);
           return (
-            <button
-              key={f.id}
-              onClick={() =>
-                setExcluded((s) => {
-                  const n = new Set(s);
-                  if (n.has(f.id)) n.delete(f.id);
-                  else n.add(f.id);
-                  return n;
-                })
-              }
-              aria-label={out ? "Put this face back in the group" : "Leave this face out of the group"}
-              className="relative aspect-square overflow-hidden rounded-xl bg-black/40"
-            >
-              <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", out && "opacity-25 grayscale")} />
-              {out && <X size={22} className="absolute inset-0 m-auto text-[#ff6b6b]" />}
-            </button>
+            <div key={f.id} className="relative aspect-square">
+              <button
+                onClick={() => setViewing(f)}
+                aria-label="See this face up close"
+                className="h-full w-full overflow-hidden rounded-xl bg-black/40"
+              >
+                <img src={f.crop} alt="" className={clsx("h-full w-full object-cover", out && "opacity-25 grayscale")} />
+                {out && (
+                  <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[10px] font-semibold text-white">left out</span>
+                )}
+              </button>
+              <button
+                onClick={() => setDeleting(f)}
+                aria-label="Delete this face"
+                className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/65 text-white shadow active:scale-90"
+              >
+                <X size={13} strokeWidth={2.5} />
+              </button>
+            </div>
           );
         })}
       </div>
@@ -233,9 +240,49 @@ function ClusterCard({ cluster, log, now, onDone }: { cluster: FaceCluster; log:
           <Sparkles size={14} /> Looks like {subjectName(looks.subject, log)} ({Math.round(looks.score * 100)}% similar)
         </div>
       )}
-      {excluded.size > 0 && <div className="text-xs text-text-dim">{excluded.size} left out — tap a face to put it back.</div>}
+      {excluded.size > 0 && <div className="text-xs text-text-dim">{excluded.size} left out of the group — tap it to put it back.</div>}
       <WhoSelect log={log} suggestion={hint?.id ?? looks?.subject} busy={busy} onPick={pick} onIgnore={() => setConfirmIgnore(true)} />
       {error && <div className="text-xs text-[#ff6b6b]">{error}</div>}
+      {viewing && (
+        <FaceViewer face={viewing} onClose={() => setViewing(null)}>
+          <button
+            onClick={() => {
+              setExcluded((s) => {
+                const n = new Set(s);
+                if (n.has(viewing.id)) n.delete(viewing.id);
+                else n.add(viewing.id);
+                return n;
+              });
+              setViewing(null);
+            }}
+            className="flex-1 rounded-full bg-chip py-3 text-sm font-semibold text-text active:scale-95"
+          >
+            {excluded.has(viewing.id) ? "Put back in the group" : "Leave out of this group"}
+          </button>
+          <button
+            onClick={() => {
+              setDeleting(viewing);
+              setViewing(null);
+            }}
+            className="flex items-center justify-center gap-1.5 rounded-full bg-chip px-5 py-3 text-sm font-semibold text-[#ff6b6b] active:scale-95"
+          >
+            <Trash2 size={15} /> Delete
+          </button>
+        </FaceViewer>
+      )}
+      {deleting && (
+        <DeleteFaceSheet
+          face={deleting}
+          onClose={() => setDeleting(null)}
+          onConfirm={async () => {
+            const id = deleting.id;
+            setDeleting(null);
+            await deleteFaces([id]).catch((e: Error) => setError(e.message));
+            avatarsChanged();
+            onDone();
+          }}
+        />
+      )}
       {confirmIgnore && (
         <IgnoreSheet
           count={cluster.ids.length - excluded.size}
@@ -444,6 +491,7 @@ export function PersonFaces({ subject, name, visits = [] }: { subject: string; n
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<Face | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -528,6 +576,9 @@ export function PersonFaces({ subject, name, visits = [] }: { subject: string; n
             {camLabel(selected.camera)} · {new Date(selected.t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             {selected.label === "auto" && ` · matched ${Math.round(selected.score * 100)}%`}
           </span>
+          <button onClick={() => setViewing(selected)} className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-text">
+            View
+          </button>
           {selected.label === "auto" && (
             <button onClick={() => set(selected.id, subject)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ background: HOME_GREEN }}>
               It's {name.split(" ")[0]}
@@ -571,6 +622,7 @@ export function PersonFaces({ subject, name, visits = [] }: { subject: string; n
       {faces && faces.some((f) => f.label === "auto") && (
         <p className="text-xs text-text-dim">Dashed faces were matched automatically. Tap one to confirm or reject it.</p>
       )}
+      {viewing && <FaceViewer face={viewing} detail={viewing.label === "auto" ? <div>Matched {Math.round(viewing.score * 100)}%</div> : null} onClose={() => setViewing(null)} />}
     </section>
   );
 }
