@@ -175,12 +175,7 @@ class Engine:
     """Step detection -> on/off pairing -> clustering, one sample at a time."""
 
     def __init__(self) -> None:
-        self.clusters: dict[int, Cluster] = {}
-        for r in db.execute("select * from clusters"):
-            c = Cluster(r["id"], r["label"], r["name"], r["color"], r["sig"], r["center"], bool(r["hidden"]), r["merged_into"])
-            for e in db.execute("select dp from events where cluster=? order by t_on desc limit 60", (c.id,)):
-                c.recent.appendleft(e["dp"])
-            self.clusters[c.id] = c
+        self.load_clusters()
         # open events: id -> (cluster, t_on, dp, sig)
         self.open: dict[int, tuple[int, float, float, str]] = {}
         for r in db.execute("select * from events where t_off is null and expired=0"):
@@ -198,6 +193,14 @@ class Engine:
         self.last_sample_wall = 0.0
         self.samples_seen = 0
         self.backfilling = False  # live samples are dropped while history replays
+
+    def load_clusters(self) -> None:
+        self.clusters: dict[int, Cluster] = {}
+        for r in db.execute("select * from clusters"):
+            c = Cluster(r["id"], r["label"], r["name"], r["color"], r["sig"], r["center"], bool(r["hidden"]), r["merged_into"])
+            for e in db.execute("select dp from events where cluster=? order by t_on desc limit 60", (c.id,)):
+                c.recent.appendleft(e["dp"])
+            self.clusters[c.id] = c
 
     # ---- helpers
     def resolve(self, cid: int) -> Cluster:
@@ -348,7 +351,9 @@ class Engine:
             if d < math.log(1 + CLUSTER_TOL) and (best_d is None or d < best_d):
                 best, best_d = c, d
         if best is None:
-            n = db.execute("select count(*) n from clusters").fetchone()["n"]
+            # max(id), not count(*): a re-seed deletes clusters, and the next
+            # rowid is max+1, so the label stays letter(id - 1) and unique.
+            n = db.execute("select coalesce(max(id), 0) n from clusters").fetchone()["n"]
             cur = db.execute(
                 "insert into clusters(label, color, sig, center, created) values(?,?,?,?,?)",
                 (letter(n), PALETTE[n % len(PALETTE)], sig, dp, t),
@@ -649,11 +654,20 @@ async def publish_loop() -> None:
 async def backfill(days: int) -> dict:
     """Seed clusters from HA's recorded sensor.other_power history (~2 min
     resolution). Runs through the same detector, without live messages."""
-    start = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    if engine.backfilling:
+        raise HTTPException(409, "a backfill is already running")
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days)).isoformat()
     async with httpx.AsyncClient(timeout=120) as c:
         r = await c.get(
             f"{HA_URL}/api/history/period/{start}",
-            params={"filter_entity_id": OTHER_ENTITY, "minimal_response": "", "no_attributes": ""},
+            # Without end_time HA returns only the first day.
+            params={
+                "filter_entity_id": OTHER_ENTITY,
+                "end_time": now.isoformat(),
+                "minimal_response": "",
+                "no_attributes": "",
+            },
             headers={"Authorization": f"Bearer {HA_TOKEN}"},
         )
     r.raise_for_status()
@@ -663,10 +677,20 @@ async def backfill(days: int) -> dict:
             pts.append((datetime.fromisoformat(st["last_changed"]).timestamp(), float(st["state"])))
         except (KeyError, ValueError, TypeError):
             pass
-    first_live = db.execute("select min(t_on) t from events").fetchone()["t"] or time.time()
-    pts = [p for p in pts if p[0] < first_live]
     if engine.backfilling:
         raise HTTPException(409, "a backfill is already running")
+    # Re-running replaces the previous seed: drop its events (and any unnamed
+    # device that only it had found), then replay up to the first live event.
+    db.execute("delete from events where source='backfill'")
+    db.execute(
+        "delete from clusters where name is null and merged_into is null"
+        " and id not in (select distinct cluster from events)"
+        " and id not in (select merged_into from clusters where merged_into is not null)"
+    )
+    db.commit()
+    engine.load_clusters()
+    first_live = db.execute("select min(t_on) t from events").fetchone()["t"] or time.time()
+    pts = [p for p in pts if p[0] < first_live]
     engine.backfilling = True
     saved = (engine.level, engine.level_legs, engine.last_t, list(engine.intervals), engine.source)
     try:
