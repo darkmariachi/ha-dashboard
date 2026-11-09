@@ -9,4 +9,6 @@ push/node_modules
 push-data
 tv
 faces-data
+nilm-data
+nilm
 faces/__pycache__

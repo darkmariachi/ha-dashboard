@@ -31,6 +31,12 @@ export default defineConfig(({ mode }) => {
           target: env.PUSH_DEV_URL || 'http://localhost:8082',
           rewrite: (path) => path.replace(/^\/api\/push/, ''),
         },
+        // Dev twin of nginx's /api/nilm/ location, for a detection service
+        // run locally (uvicorn --app-dir nilm app:app --port 8095).
+        '/api/nilm': {
+          target: env.NILM_DEV_URL || 'http://localhost:8095',
+          rewrite: (path) => path.replace(/^\/api\/nilm/, ''),
+        },
       },
     },
   }

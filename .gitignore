@@ -28,3 +28,4 @@ dist-ssr
 push/node_modules
 push-data
 faces-data/
+nilm-data/

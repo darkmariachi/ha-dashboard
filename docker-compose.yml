@@ -67,3 +67,23 @@ services:
     volumes:
       - ./faces-data:/data
     restart: unless-stopped
+
+  # Unnamed-device detection for the Energy page (nilm/app.py): splits the
+  # load Sense hasn't identified into devices by their on/off steps, and
+  # mirrors them into HA as sensor.nilm_device_*. Uses Sense's realtime
+  # stream when SENSE_EMAIL/SENSE_PASSWORD are set, else HA's ~2-minute
+  # Sense updates. Only reachable through the dashboard's nginx at
+  # /api/nilm/ (no published port).
+  nilm:
+    build:
+      context: ./nilm
+    container_name: ha-dashboard-nilm
+    environment:
+      HA_URL: ${PUSH_HA_URL:-http://192.168.1.54:8123}
+      HA_TOKEN: ${PUSH_HA_TOKEN:-}
+      SENSE_EMAIL: ${SENSE_EMAIL:-}
+      SENSE_PASSWORD: ${SENSE_PASSWORD:-}
+      NILM_PUBLISH: ${NILM_PUBLISH:-1}
+    volumes:
+      - ./nilm-data:/data
+    restart: unless-stopped

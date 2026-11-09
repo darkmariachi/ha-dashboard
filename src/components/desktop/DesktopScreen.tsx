@@ -51,6 +51,7 @@ import { QuickActionToast } from "../home/QuickActionToast";
 import { SpotifySearchModal } from "../home/SpotifySearchModal";
 import { weatherIcon } from "../home/statusIcons";
 import { DetectionsPanel, EnergyBreakdown, IndoorPanel, LightsPanel, PresencePanel } from "./analysis";
+import { LoadsSection } from "./loads";
 import { DevicesSummary, FleetTable, NetworkConsole, NotifyPanel, ScreenTimePanel, ServerPanel, WorkstationPanel } from "./devices";
 import { VisitorsConsole } from "./visitors";
 import { FaceScanPanel } from "./faceScan";
@@ -177,6 +178,7 @@ function Energy() {
     <>
       <PowerPanel height={240} />
       <EnergyBreakdown delay={80} />
+      <LoadsSection delay={120} />
       <div className="grid gap-3 xl:grid-cols-12">
         <ClimatePanel className="xl:col-span-5" delay={160} />
         <IndoorPanel className="xl:col-span-7" delay={200} />
