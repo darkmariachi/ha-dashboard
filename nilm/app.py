@@ -796,14 +796,34 @@ def event_json(e) -> dict:
     return {"id": e["id"], "cluster": c.id, "label": c.label, "t_on": e["t_on"], "t_off": e["t_off"], "dp": round(e["dp"]), "sig": e["sig"]}
 
 
-@app.get("/events")
-async def events(request: Request, limit: int = 100, cluster: int | None = None):
-    await require_ha_token(request)
-    rows = db.execute("select * from events where expired=0 order by t_on desc limit ?", (limit * 4 if cluster else limit,)).fetchall()
-    out = [event_json(r) for r in rows]
-    if cluster is not None:
-        out = [e for e in out if e["cluster"] == cluster][:limit]
+def event_detail(e) -> dict:
+    """event_json plus what the debugger wants: how the run ended and where it came from."""
+    out = event_json(e)
+    out.update(
+        dp_off=None if e["dp_off"] is None else round(e["dp_off"]),
+        source=e["source"],
+        # observed: an off step matched it; inferred: closed by reconcile/timeout;
+        # dropped: still open at the end of a history seed
+        end="dropped" if e["expired"] else "running" if e["t_off"] is None else "observed" if e["dp_off"] is not None else "inferred",
+    )
     return out
+
+
+@app.get("/events")
+async def events(request: Request, limit: int = 100, cluster: int | None = None, days: float = 7):
+    await require_ha_token(request)
+    if cluster is None:
+        rows = db.execute("select * from events where expired=0 order by t_on desc limit ?", (limit,)).fetchall()
+        return [event_json(r) for r in rows]
+    # one device's runs, including those of devices merged into it, for the hover details
+    ids = [c.id for c in engine.clusters.values() if engine.resolve(c.id).id == cluster]
+    if not ids:
+        raise HTTPException(404, "no such device")
+    rows = db.execute(
+        f"select * from events where cluster in ({','.join('?' * len(ids))}) and t_on > ? order by t_on desc limit ?",
+        (*ids, time.time() - days * 86400, min(limit, 2000)),
+    ).fetchall()
+    return [event_detail(r) for r in rows]
 
 
 @app.get("/clusters")

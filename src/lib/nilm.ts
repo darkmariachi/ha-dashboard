@@ -98,6 +98,16 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 export const nilmStatus = () => call<NilmStatus>("status");
 export const nilmDevices = () => call<NilmDevice[]>("clusters");
 export const nilmEvents = (limit = 60) => call<NilmEvent[]>(`events?limit=${limit}`);
+
+/** A run with how it ended, for the device hover details. */
+export interface NilmRun extends NilmEvent {
+  dp_off: number | null;
+  source: string;
+  /** observed off step / closed by inference / dropped at the end of a seed / still on */
+  end: "observed" | "inferred" | "dropped" | "running";
+}
+/** One device's runs over the last `days` (same window as its hour bars). */
+export const nilmDeviceRuns = (cluster: number, days = 7) => call<NilmRun[]>(`events?cluster=${cluster}&days=${days}&limit=2000`);
 export const nilmLive = (seconds: number) =>
   call<{ samples: NilmSample[]; events: NilmEvent[]; on: Record<string, number> }>(`live?seconds=${seconds}`);
 export const renameDevice = (id: number, name: string) => call(`clusters/${id}`, { name });

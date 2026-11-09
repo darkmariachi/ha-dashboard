@@ -8,6 +8,7 @@ import {
   hideDevice,
   legLabel,
   mergeDevices,
+  nilmDeviceRuns,
   nilmDevices,
   nilmLive,
   nilmStatus,
@@ -15,6 +16,7 @@ import {
   type NilmDevice,
   type NilmEvent,
   type NilmMessage,
+  type NilmRun,
   type NilmSample,
   type NilmStatus,
 } from "../../lib/nilm";
@@ -158,7 +160,7 @@ function LiveChart({
       {hv !== null && hover !== null && hs && (
         <div
           className="pointer-events-none absolute top-1 z-10 min-w-[150px] rounded-md border border-dx-line bg-[#0d0f1a]/95 px-2.5 py-1.5 text-[11px] shadow-lg"
-          style={{ left: Math.min(hover + 12, width - 170) }}
+          style={{ left: Math.min(hover + 12, width - 200) }}
         >
           <div className="mb-0.5 font-semibold text-dx-text">{clock(hv)}</div>
           <div className="flex justify-between gap-3 text-dx-dim">
@@ -168,12 +170,17 @@ function LiveChart({
           {hon.map((e) => {
             const dev = devices.get(e.cluster);
             return dev ? (
-              <div key={e.id} className="flex items-center justify-between gap-3 text-dx-dim">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ background: dev.color }} />
-                  {deviceName(dev)}
-                </span>
-                <span className="dx-num text-dx-text">{kw(e.dp)}</span>
+              <div key={e.id} className="text-dx-dim">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ background: dev.color }} />
+                    {deviceName(dev)}
+                  </span>
+                  <span className="dx-num text-dx-text">{kw(e.dp)}</span>
+                </div>
+                <div className="dx-num pl-3.5 text-[10px] text-dx-faint">
+                  {clock(e.t_on)}–{e.t_off ? clock(e.t_off) : "now"} · {mins(((e.t_off ?? now) - e.t_on) / 60)} · #{e.id}
+                </div>
               </div>
             ) : null;
           })}
@@ -185,13 +192,108 @@ function LiveChart({
 
 /* --------------------------------------------------------- device card */
 
-function HourBars({ hours, color }: { hours: number[]; color: string }) {
-  const m = Math.max(1, ...hours);
+const hourName = (h: number) => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+const dayClock = (t: number) =>
+  new Date(t * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+const END_TEXT: Record<NilmRun["end"], string> = {
+  observed: "off seen",
+  inferred: "off inferred",
+  dropped: "end unknown",
+  running: "running",
+};
+
+/** One run, as a tooltip row: when, how long, step sizes, how it ended. */
+function RunRow({ r, now }: { r: NilmRun; now: number }) {
+  const dur = ((r.t_off ?? now) - r.t_on) / 60;
   return (
-    <div className="flex h-7 items-end gap-[2px]" title="When it turns on (by hour, last 7 days)">
-      {hours.map((h, i) => (
-        <div key={i} className="flex-1 rounded-[1px]" style={{ height: `${Math.max(6, (h / m) * 100)}%`, background: h ? color : "rgba(255,255,255,0.06)", opacity: h ? 0.35 + 0.65 * (h / m) : 1 }} />
-      ))}
+    <div className="grid grid-cols-[1fr_auto] gap-x-3 border-t border-white/5 py-1 first:border-0">
+      <span className="dx-num text-dx-text">{dayClock(r.t_on)}</span>
+      <span className="dx-num text-right text-dx-text">{r.end === "dropped" ? "—" : mins(dur)}</span>
+      <span className="dx-num text-dx-faint">
+        +{kw(r.dp)}
+        {r.dp_off != null && ` / −${kw(r.dp_off)}`} · {legLabel(r.sig)}
+      </span>
+      <span className="text-right text-dx-faint">
+        {END_TEXT[r.end]} · {r.source} · #{r.id}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * When it turns on, by local hour over the last 7 days. Hovering a bar lists
+ * the runs that started in that hour (fetched once per hover session).
+ */
+function HourBars({ dev, now }: { dev: NilmDevice; now: number }) {
+  const { hours, color } = dev;
+  const m = Math.max(1, ...hours);
+  const [hover, setHover] = useState<number | null>(null);
+  const [runs, setRuns] = useState<NilmRun[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const fetched = useRef<string | null>(null);
+  // refetch when the device's run count changes (a new run, a merge)
+  const key = `${dev.id}:${dev.runs_7d}`;
+  useEffect(() => {
+    if (hover === null || fetched.current === key) return;
+    fetched.current = key;
+    nilmDeviceRuns(dev.id)
+      .then((r) => {
+        setRuns(r);
+        setErr(null);
+      })
+      .catch((e) => setErr(String(e.message ?? e)));
+  }, [hover, key, dev.id]);
+
+  const inHour = hover === null || !runs ? [] : runs.filter((r) => new Date(r.t_on * 1000).getHours() === hover);
+  const shownRuns = inHour.slice(0, 8);
+  const durs = inHour.filter((r) => r.end === "observed" && r.t_off).map((r) => (r.t_off! - r.t_on) / 60);
+  return (
+    <div className="relative" onMouseLeave={() => setHover(null)}>
+      <div className="flex h-7 items-end gap-[2px]">
+        {hours.map((h, i) => (
+          <div key={i} className="flex h-full flex-1 cursor-default items-end" onMouseEnter={() => setHover(i)}>
+            <div
+              className="w-full rounded-[1px] transition-opacity"
+              style={{
+                height: `${Math.max(6, (h / m) * 100)}%`,
+                background: h ? color : "rgba(255,255,255,0.06)",
+                opacity: hover === i ? 1 : h ? 0.35 + 0.65 * (h / m) : 1,
+                outline: hover === i ? `1px solid ${color}` : undefined,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      {hover !== null && (
+        <div
+          className="pointer-events-none absolute bottom-full z-20 mb-1.5 w-[300px] rounded-md border border-dx-line bg-[#0d0f1a]/95 px-2.5 py-1.5 text-[10.5px] shadow-lg"
+          style={{ left: `clamp(0px, calc(${((hover + 0.5) / 24) * 100}% - 150px), calc(100% - 300px))` }}
+        >
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            <span className="font-semibold text-dx-text">
+              {hourName(hover)}–{hourName((hover + 1) % 24)}
+            </span>
+            <span className="text-dx-dim">
+              {hours[hover]} run{hours[hover] === 1 ? "" : "s"} started · last 7 days
+              {durs.length > 0 && ` · median ${mins([...durs].sort((a, b) => a - b)[Math.floor(durs.length / 2)])}`}
+            </span>
+          </div>
+          {err ? (
+            <div className="text-dx-faint">Couldn't load runs: {err}</div>
+          ) : !runs ? (
+            <div className="text-dx-faint">Loading runs…</div>
+          ) : inHour.length === 0 ? (
+            <div className="text-dx-faint">No runs started in this hour.</div>
+          ) : (
+            <>
+              {shownRuns.map((r) => (
+                <RunRow key={r.id} r={r} now={now / 1000} />
+              ))}
+              {inHour.length > shownRuns.length && <div className="pt-1 text-dx-faint">+{inHour.length - shownRuns.length} earlier</div>}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -305,7 +407,7 @@ function DeviceCard({
           <div className="dx-num text-dx-text">{dev.kwh_per_day.toFixed(1)} kWh</div>
         </div>
       </div>
-      <HourBars hours={dev.hours} color={dev.color} />
+      <HourBars dev={dev} now={now} />
       <div className="flex justify-between text-[10px] text-dx-faint">
         <span>12a</span>
         <span>{on ? <span style={{ color: dev.color }}>on now</span> : dev.last_on ? `last on ${ago(dev.last_on, now)}` : "—"}</span>
