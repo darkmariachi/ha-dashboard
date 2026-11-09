@@ -83,27 +83,65 @@ export function useCameraEvents(now: Date) {
   return out.sort((a, b) => b.t - a.t);
 }
 
+/**
+ * Signed URLs for HA paths, reused until shortly before they expire.
+ *
+ * Never put an expired signature in the page: HA counts every request with
+ * one as a failed login, and the LAN reaches HA through the router's hairpin
+ * NAT (one IP for every device), so a handful of stale snapshot URLs (an
+ * idle tab waking up, lazy images scrolling into view) gets 192.168.1.1
+ * IP-banned and locks the whole house out.
+ */
+const SIGN_SECONDS = 6 * 3600;
+const signedCache = new Map<string, { url: string; exp: number }>();
+function freshSigned(path: string) {
+  const hit = signedCache.get(path);
+  // A lazy image may only load a while after it's rendered: keep a margin.
+  return hit && hit.exp - Date.now() > SIGN_SECONDS * 500 ? hit.url : null;
+}
+export function signedFromCache(path: string) {
+  return freshSigned(path) ?? undefined;
+}
+async function signCached(signPath: (p: string, s?: number) => Promise<string>, path: string) {
+  const fresh = freshSigned(path);
+  if (fresh) return fresh;
+  const url = await signPath(path, SIGN_SECONDS);
+  signedCache.set(path, { url, exp: Date.now() + SIGN_SECONDS * 1000 });
+  return url;
+}
+
 /** <img> for an HA path that needs signing (the Protect proxy requires
- * auth); signs once per path. */
-const signedCache = new Map<string, string>();
+ * auth). Re-signs when the tab comes back after its signature aged. */
 export function SignedImg({ path, className }: { path: string; className?: string }) {
   const { signPath } = useHa();
-  const [src, setSrc] = useState(() => signedCache.get(path) ?? null);
+  const [src, setSrc] = useState(() => freshSigned(path));
   const [failed, setFailed] = useState(false);
+  const [retried, setRetried] = useState(false);
 
   useEffect(() => {
-    if (signedCache.has(path)) return;
     let cancelled = false;
-    signPath(path, 300)
-      .then((url) => {
-        signedCache.set(path, url);
-        if (!cancelled) setSrc(url);
-      })
-      .catch(() => !cancelled && setFailed(true));
+    const sign = () =>
+      signCached(signPath, path)
+        .then((url) => !cancelled && setSrc((cur) => (cur === url ? cur : url)))
+        .catch(() => !cancelled && setFailed(true));
+    sign();
+    const onVisible = () => {
+      if (!document.hidden && !freshSigned(path)) sign();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [path, signPath]);
+
+  function onError() {
+    // One fresh signature, then give up (each failure counts against the ban).
+    if (retried) return setFailed(true);
+    setRetried(true);
+    signedCache.delete(path);
+    signCached(signPath, path).then(setSrc, () => setFailed(true));
+  }
 
   if (failed) {
     return (
@@ -113,7 +151,7 @@ export function SignedImg({ path, className }: { path: string; className?: strin
     );
   }
   return src ? (
-    <img src={src} alt="" loading="lazy" className={clsx("bg-black/40 object-cover", className)} onError={() => setFailed(true)} />
+    <img src={src} alt="" loading="lazy" className={clsx("bg-black/40 object-cover", className)} onError={onError} />
   ) : (
     <div className={clsx("animate-pulse bg-black/30", className)} />
   );
@@ -138,7 +176,7 @@ function EventSheet({ event, onClose }: { event: CameraEvent; onClose: () => voi
 
   useEffect(() => {
     let cancelled = false;
-    signPath(clipPath(event), 300)
+    signPath(clipPath(event), 3600)
       .then((url) => !cancelled && setClip(url))
       .catch(() => !cancelled && setClipFailed(true));
     return () => {
@@ -155,7 +193,7 @@ function EventSheet({ event, onClose }: { event: CameraEvent; onClose: () => voi
       {clip && !clipFailed ? (
         <video
           src={clip}
-          poster={signedCache.get(snapshotPath(event, 640))}
+          poster={signedFromCache(snapshotPath(event, 640))}
           controls
           autoPlay
           muted

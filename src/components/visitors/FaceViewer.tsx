@@ -15,7 +15,7 @@ function FaceClip({ face, className }: { face: Face; className?: string }) {
   useEffect(() => {
     if (!path) return;
     let cancelled = false;
-    signPath(path, 600)
+    signPath(path, 3600)
       .then((url) => !cancelled && setSrc(url))
       .catch(() => !cancelled && setState("failed"));
     return () => {
