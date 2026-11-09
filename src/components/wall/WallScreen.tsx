@@ -397,7 +397,10 @@ function useIdle(ms: number) {
   return [idle, () => setIdle(false)] as const;
 }
 
-/** Every camera, a small clock and the temperature. A tap anywhere only wakes
+/** The cameras that matter at the door, side by side. */
+const SAVER_CAMERAS = ["camera.g4_doorbell_pro_medium", "camera.driveway_medium"];
+
+/** The doorbell and driveway cameras, a small clock and the temperature. A tap anywhere only wakes
  * the panel; it never reaches a camera or a switch underneath. */
 function CameraSaver({ onWake }: { onWake: () => void }) {
   const { entities, entitiesWithArea } = useHa();
@@ -406,8 +409,8 @@ function CameraSaver({ onWake }: { onWake: () => void }) {
 
   return (
     <div className="fixed inset-0 z-40 bg-black">
-      <div className="grid h-full grid-cols-3 grid-rows-2 gap-1 p-1">
-        {CURATED_CAMERAS.map((cam) => (
+      <div className="grid h-full grid-cols-2 gap-1 p-1">
+        {SAVER_CAMERAS.map((id) => CURATED_CAMERAS.find((c) => c.entityId === id)!).map((cam) => (
           <CameraCard
             key={cam.entityId}
             ent={resolveCuratedCamera(entitiesWithArea, cam)}
