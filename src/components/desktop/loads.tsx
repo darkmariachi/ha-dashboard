@@ -159,7 +159,7 @@ function LiveChart({
       </svg>
       {hv !== null && hover !== null && hs && (
         <div
-          className="pointer-events-none absolute top-1 z-10 min-w-[150px] rounded-md border border-dx-line bg-[#0d0f1a]/95 px-2.5 py-1.5 text-[11px] shadow-lg"
+          className="pointer-events-none absolute top-1 z-10 min-w-[150px] rounded-md border border-dx-line bg-dx-raise/95 px-2.5 py-1.5 text-[11px] shadow-lg"
           style={{ left: Math.min(hover + 12, width - 200) }}
         >
           <div className="mb-0.5 font-semibold text-dx-text">{clock(hv)}</div>
@@ -206,7 +206,7 @@ const END_TEXT: Record<NilmRun["end"], string> = {
 function RunRow({ r, now }: { r: NilmRun; now: number }) {
   const dur = ((r.t_off ?? now) - r.t_on) / 60;
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-x-3 border-t border-white/5 py-1 first:border-0">
+    <div className="grid grid-cols-[1fr_auto] gap-x-3 border-t border-dx-line py-1 first:border-0">
       <span className="dx-num text-dx-text">{dayClock(r.t_on)}</span>
       <span className="dx-num text-right text-dx-text">{r.end === "dropped" ? "—" : mins(dur)}</span>
       <span className="dx-num text-dx-faint">
@@ -266,7 +266,7 @@ function HourBars({ dev, now }: { dev: NilmDevice; now: number }) {
       </div>
       {hover !== null && (
         <div
-          className="pointer-events-none absolute bottom-full z-20 mb-1.5 w-[300px] rounded-md border border-dx-line bg-[#0d0f1a]/95 px-2.5 py-1.5 text-[10.5px] shadow-lg"
+          className="pointer-events-none absolute bottom-full z-20 mb-1.5 w-[300px] rounded-md border border-dx-line bg-dx-raise/95 px-2.5 py-1.5 text-[10.5px] shadow-lg"
           style={{ left: `clamp(0px, calc(${((hover + 0.5) / 24) * 100}% - 150px), calc(100% - 300px))` }}
         >
           <div className="mb-1 flex items-baseline justify-between gap-2">
