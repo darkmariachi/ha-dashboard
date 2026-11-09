@@ -44,6 +44,8 @@ from fastapi.responses import StreamingResponse
 
 log = logging.getLogger("nilm")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# httpx logs every request at INFO; publishing alone is ~40 a minute.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 HA_URL = os.environ.get("HA_URL", "http://192.168.1.54:8123").rstrip("/")
 HA_TOKEN = os.environ.get("HA_TOKEN", "")
