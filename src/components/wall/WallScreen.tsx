@@ -397,8 +397,12 @@ function useIdle(ms: number) {
   return [idle, () => setIdle(false)] as const;
 }
 
-/** The cameras that matter at the door, side by side. */
-const SAVER_CAMERAS = ["camera.g4_doorbell_pro_medium", "camera.driveway_medium"];
+/** The cameras that matter at the door, side by side. The driveway is the
+ * wide one, and its left side is a bush: keep the right (car and street). */
+const SAVER_CAMERAS = [
+  { entityId: "camera.g4_doorbell_pro_medium", position: undefined },
+  { entityId: "camera.driveway_medium", position: "85% 50%" },
+];
 
 /** The doorbell and driveway cameras, a small clock and the temperature. A tap anywhere only wakes
  * the panel; it never reaches a camera or a switch underneath. */
@@ -409,11 +413,12 @@ function CameraSaver({ onWake }: { onWake: () => void }) {
 
   return (
     <div className="fixed inset-0 z-40 bg-black">
-      <div className="grid h-full grid-cols-2 gap-1 p-1">
-        {SAVER_CAMERAS.map((id) => CURATED_CAMERAS.find((c) => c.entityId === id)!).map((cam) => (
+      <div className="grid h-full grid-cols-[2fr_3fr] gap-1 p-1">
+        {SAVER_CAMERAS.map(({ entityId, position }) => (
           <CameraCard
-            key={cam.entityId}
-            ent={resolveCuratedCamera(entitiesWithArea, cam)}
+            key={entityId}
+            ent={resolveCuratedCamera(entitiesWithArea, CURATED_CAMERAS.find((c) => c.entityId === entityId)!)}
+            objectPosition={position}
             bare
             fill
             snapshotEveryMs={SAVER_SNAPSHOT_MS}

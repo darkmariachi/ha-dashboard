@@ -24,6 +24,7 @@ export function CameraCard({
   bare,
   fill,
   snapshotEveryMs,
+  objectPosition,
 }: {
   ent: EntityWithArea;
   isFavorite?: boolean;
@@ -37,6 +38,8 @@ export function CameraCard({
    * stream — for the phone, where several simultaneous streams would eat
    * mobile data. Tapping through to fullscreen still opens the live stream. */
   snapshotEveryMs?: number;
+  /** Which part of the picture to keep when it's cropped (CSS object-position). */
+  objectPosition?: string;
 }) {
   const { signPath } = useHa();
   const dead = isDead(ent);
@@ -148,6 +151,7 @@ export function CameraCard({
             src={imgSrc}
             alt={ent.friendlyName}
             className="h-full w-full object-cover"
+            style={objectPosition ? { objectPosition } : undefined}
             onError={() => setErrored(true)}
           />
         ) : (
