@@ -169,14 +169,29 @@ export function HaProvider({ children }: { children: React.ReactNode }) {
   }, [teardown]);
 
   // Attempt auto-login from saved credentials on first mount.
+  // If HA can't be reached (down, restarting, network, or an IP ban), keep
+  // retrying with backoff so wall screens recover without anyone touching
+  // them. Only connection failures are retried: a rejected token stops, since
+  // repeated bad logins are exactly what gets an IP banned.
   useEffect(() => {
-    const saved = loadCredentials();
-    if (saved) {
-      login(saved.hassUrl, saved.token).catch(() => {
-        /* surfaced via status/error state already */
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    let attempt = 0;
+    const tryLogin = () => {
+      const saved = loadCredentials();
+      if (!saved || stopped) return;
+      login(saved.hassUrl, saved.token).catch((err) => {
+        if (stopped || !(err instanceof ConnectError)) return;
+        attempt += 1;
+        timer = setTimeout(tryLogin, Math.min(120_000, 5_000 * 2 ** Math.min(attempt, 5)));
       });
-    }
-    return () => teardown();
+    };
+    tryLogin();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      teardown();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
