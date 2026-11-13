@@ -34,6 +34,7 @@ import {
   LayoutGrid,
   ListTree,
   LogOut,
+  Maximize,
   Music,
   Palette,
   Settings,
@@ -69,6 +70,7 @@ import {
 } from "./monitor";
 import { Btn, C, Dot, Label } from "./ui";
 import { ThemePicker } from "./ThemePicker";
+import { CameraWall } from "./CameraWall";
 import { themeVars, useDesktopTheme, type DesktopTheme } from "./themes";
 
 interface Page {
@@ -154,8 +156,15 @@ function Rooms() {
 }
 
 function Security() {
+  const navigate = useNavigate();
   return (
     <>
+      <div className="-mb-1 flex items-center justify-between">
+        <Label className="text-dx-faint">Cameras</Label>
+        <Btn onClick={() => navigate("/desktop/cameras")} title="Only the cameras, filling the window — for a second monitor">
+          <Maximize size={12} /> Camera wall
+        </Btn>
+      </div>
       <div className="dx-in grid grid-cols-2 gap-2 xl:grid-cols-3">
         {CURATED_CAMERAS.map((c) => (
           <CameraTile key={c.entityId} entityId={c.entityId} label={c.label} />
@@ -408,9 +417,18 @@ export function DesktopScreen() {
     setToast((t) => ({ action, nonce: (t?.nonce ?? 0) + 1 }));
   }
 
+  const wall = pathname.replace(/\/$/, "") === "/desktop/cameras";
   useEffect(() => {
-    document.title = `${page.label} · Home`;
-  }, [page.label]);
+    if (!wall) document.title = `${page.label} · Home`;
+  }, [page.label, wall]);
+
+  // The camera wall drops the rail and top bar: cameras only, for a second monitor.
+  if (wall)
+    return (
+      <div className="dx relative h-full overflow-hidden" data-sheet-root data-dx-theme={theme.id} style={themeVars(theme)}>
+        <CameraWall />
+      </div>
+    );
 
   return (
     <div className="dx relative flex h-full overflow-hidden" data-sheet-root data-dx-theme={theme.id} style={themeVars(theme)}>

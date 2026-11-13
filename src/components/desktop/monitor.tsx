@@ -429,7 +429,20 @@ function CameraLive({ entityId, label, onClose }: { entityId: string; label: str
   );
 }
 
-export function CameraTile({ entityId, label, everyMs = 4000, className }: { entityId: string; label: string; everyMs?: number; className?: string }) {
+export function CameraTile({
+  entityId,
+  label,
+  everyMs = 4000,
+  className,
+  fit = "cover",
+}: {
+  entityId: string;
+  label: string;
+  everyMs?: number;
+  className?: string;
+  /** "contain" shows the whole frame (letterboxed) instead of cropping it. */
+  fit?: "cover" | "contain";
+}) {
   const { src, stale } = useSignedSnapshot(entityId, everyMs);
   const failed = stale && !src;
   const [live, setLive] = useState(false);
@@ -441,7 +454,7 @@ export function CameraTile({ entityId, label, everyMs = 4000, className }: { ent
         className={clsx("group relative overflow-hidden rounded-md border border-dx-line bg-black text-left", className ?? "aspect-video")}
       >
         {src ? (
-          <img src={src} alt={label} className={clsx("absolute inset-0 h-full w-full object-cover transition-opacity group-hover:opacity-100", stale ? "opacity-50" : "opacity-90")} />
+          <img src={src} alt={label} className={clsx("absolute inset-0 h-full w-full transition-opacity", fit === "contain" ? "object-contain" : "object-cover", "group-hover:opacity-100", stale ? "opacity-50" : "opacity-90")} />
         ) : (
           <div className="dx-grid absolute inset-0 flex items-center justify-center text-dx-faint">
             <Cctv size={22} />
