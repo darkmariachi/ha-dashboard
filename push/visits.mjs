@@ -18,6 +18,7 @@
 // That smooths over Wi-Fi blips and the burst of state changes an HA
 // restart causes.
 
+import { keepAlive } from "./keepalive.mjs";
 import { readFile, writeFile, rename } from "node:fs/promises";
 
 const MIN_AWAY_MS = 10 * 60_000;
@@ -298,7 +299,9 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
       update(s.entity_id, s.state, Date.parse(s.last_changed), true);
     }
 
+    let retried = false;
     ws.addEventListener("message", async (ev) => {
+      if (retried) return; // a socket we gave up on
       let msg;
       try {
         msg = JSON.parse(ev.data);
@@ -343,10 +346,15 @@ export async function startVisitLog({ haUrl, token, file, notify, notifyNewDevic
     });
 
     ws.addEventListener("error", (e) => log("visit log socket error", e.message ?? ""));
-    ws.addEventListener("close", () => {
+    function retry(why) {
+      if (retried) return;
+      retried = true;
+      log("visit log", why, "- retrying in", backoff / 1000, "s");
       setTimeout(connect, backoff);
       backoff = Math.min(backoff * 2, 60_000);
-    });
+    }
+    ws.addEventListener("close", () => retry("disconnected"));
+    keepAlive(ws, () => retry("stopped hearing from HA"));
   }
 
   connect();

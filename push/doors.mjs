@@ -9,6 +9,8 @@
 // has been silent for `offlineMs` that gets its own notification, and another
 // when it reports again.
 
+import { keepAlive } from "./keepalive.mjs";
+
 /** "binary_sensor.a=Front Door,binary_sensor.b=Garage" -> [{ entityId, label }] */
 export function parseDoors(spec) {
   return spec
@@ -130,7 +132,9 @@ export function startDoorWatcher({ haUrl, token, doors, thresholdMs, repeatMs, o
     let nextId = 1;
     let statesId = 0;
 
+    let retried = false;
     ws.addEventListener("message", (ev) => {
+      if (retried) return; // a socket we gave up on
       let msg;
       try {
         msg = JSON.parse(ev.data);
@@ -165,11 +169,15 @@ export function startDoorWatcher({ haUrl, token, doors, thresholdMs, repeatMs, o
 
     // A close always follows an error, so reconnect from there only.
     ws.addEventListener("error", (e) => log("door watcher socket error", e.message ?? ""));
-    ws.addEventListener("close", () => {
-      log("door watcher disconnected, retrying in", backoff / 1000, "s");
+    function retry(why) {
+      if (retried) return;
+      retried = true;
+      log("door watcher", why, "- retrying in", backoff / 1000, "s");
       setTimeout(connect, backoff);
       backoff = Math.min(backoff * 2, 60_000);
-    });
+    }
+    ws.addEventListener("close", () => retry("disconnected"));
+    keepAlive(ws, () => retry("stopped hearing from HA"));
   }
 
   connect();

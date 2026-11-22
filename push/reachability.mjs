@@ -6,6 +6,8 @@
 // whole group is back. Both alerts for a group share a tag so the "back"
 // message replaces the "unreachable" one.
 
+import { keepAlive } from "./keepalive.mjs";
+
 /**
  * "Driveway lights:light.a,light.b;Porch:light.c"
  *   -> [{ label: "Driveway lights", entityIds: ["light.a", "light.b"] }, ...]
@@ -118,7 +120,9 @@ export function startReachabilityWatcher({ haUrl, token, groups, thresholdMs, no
     let nextId = 1;
     let statesId = 0;
 
+    let retried = false;
     ws.addEventListener("message", (ev) => {
+      if (retried) return; // a socket we gave up on
       let msg;
       try {
         msg = JSON.parse(ev.data);
@@ -152,11 +156,15 @@ export function startReachabilityWatcher({ haUrl, token, groups, thresholdMs, no
 
     // A close always follows an error, so reconnect from there only.
     ws.addEventListener("error", (e) => log("reachability watcher socket error", e.message ?? ""));
-    ws.addEventListener("close", () => {
-      log("reachability watcher disconnected, retrying in", backoff / 1000, "s");
+    function retry(why) {
+      if (retried) return;
+      retried = true;
+      log("reachability watcher", why, "- retrying in", backoff / 1000, "s");
       setTimeout(connect, backoff);
       backoff = Math.min(backoff * 2, 60_000);
-    });
+    }
+    ws.addEventListener("close", () => retry("disconnected"));
+    keepAlive(ws, () => retry("stopped hearing from HA"));
   }
 
   connect();

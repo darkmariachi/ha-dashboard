@@ -84,6 +84,12 @@ NEAREST = 0.28  # below MATCH: only a "looks like" hint on an unnamed group
 CANDIDATE_MIN = 0.15  # per-visitor suggestions below this likeness are dropped
 CLUSTER = 0.50  # similarity that links two unlabelled faces in a cluster
 PACE_S = 0.25  # pause between queue items (Protect exports each frame)
+# Protect only serves a frame once its recording segment is written: since
+# 2026-11-20 that takes up to ~30 s, and asking sooner is a 404. Live frames
+# wait LIVE_LAG_MS, then retry every RETRY_GAP_MS, up to MAX_TRIES.
+LIVE_LAG_MS = 20_000
+RETRY_GAP_MS = 15_000
+MAX_TRIES = 5
 
 log = logging.getLogger("faces")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -470,9 +476,12 @@ def worker():
         return
     client = httpx.Client()
     while True:
+        now = now_ms()
         with db_lock:
             item = db.execute(
-                "select * from queue where status = 'pending' order by prio desc, t desc limit 1"
+                "select * from queue where status = 'pending' and t + 1000 <= ?"
+                " and (tries = 0 or updated <= ?) order by prio desc, t desc limit 1",
+                (now - LIVE_LAG_MS, now - RETRY_GAP_MS),
             ).fetchone()
         if not item:
             time.sleep(2)
@@ -506,7 +515,7 @@ def worker():
                 tries = item["tries"] + 1
                 db.execute(
                     "update queue set tries = ?, status = ?, error = ?, updated = ? where key = ?",
-                    (tries, "failed" if tries >= 3 else "pending", str(e)[:300], now_ms(), item["key"]),
+                    (tries, "failed" if tries >= MAX_TRIES else "pending", str(e)[:300], now_ms(), item["key"]),
                 )
                 db.commit()
             log.warning("frame %s failed: %s", item["key"], e)
