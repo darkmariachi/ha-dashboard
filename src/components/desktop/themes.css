@@ -471,5 +471,5 @@
 .dx-theme-card:hover { transform: translateY(-2px); }
 
 @media (prefers-reduced-motion: reduce) {
-  .dx-fx::after, .dx .dx-h1 { animation: none !important; }
+  .dx-fx::before, .dx-fx::after, .dx .dx-h1 { animation: none !important; }
 }

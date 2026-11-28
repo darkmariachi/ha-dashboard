@@ -2,12 +2,14 @@ import { Check, X } from "lucide-react";
 import { useEffect } from "react";
 import { DESKTOP_THEMES, type DesktopTheme } from "./themes";
 import doodles from "./doodles.svg";
+import palms from "./palms.svg";
 
 /** Fonts per theme, for the preview cards (the real ones live in themes.css). */
 const PREVIEW_FONT: Record<string, { title: string; body: string; num: string; upper: boolean }> = {
   neon: { title: "Space Grotesk Variable", body: "Space Grotesk Variable", num: "JetBrains Mono Variable", upper: true },
   netrunner: { title: "Rajdhani", body: "Rajdhani", num: "Share Tech Mono", upper: true },
   vice: { title: "Pacifico", body: "Outfit Variable", num: "JetBrains Mono Variable", upper: false },
+  sunshine: { title: "Anton", body: "Barlow", num: "Barlow Condensed", upper: true },
   tactical: { title: "Bebas Neue", body: "Barlow", num: "Barlow Condensed", upper: true },
   hextech: { title: "Cinzel Variable", body: "Barlow", num: "Barlow", upper: true },
   ocarina: { title: "Uncial Antiqua", body: "Nunito Variable", num: "Nunito Variable", upper: false },
@@ -24,6 +26,7 @@ function Preview({ t }: { t: DesktopTheme }) {
     neon: { radius: 8, clip: undefined },
     netrunner: { radius: 0, clip: "polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))" },
     vice: { radius: 14, clip: undefined },
+    sunshine: { radius: 10, clip: undefined },
     tactical: { radius: 0, clip: undefined },
     hextech: { radius: 0, clip: undefined },
     ocarina: { radius: 12, clip: undefined },
@@ -33,6 +36,8 @@ function Preview({ t }: { t: DesktopTheme }) {
   const bg =
     t.id === "vice"
       ? "linear-gradient(180deg, #0d0620, #2a0b45 45%, #6a1257 75%, #f7854a)"
+      : t.id === "sunshine"
+        ? `url(${palms}) center bottom / 260% auto no-repeat, radial-gradient(120px 120px at 65% 92%, #ffc35a, #ff7a3d 45%, transparent 70%), linear-gradient(180deg, #0b0a24, #4a1259 50%, #f0603f 85%, #ffb056)`
       : t.id === "hextech"
         ? `radial-gradient(260px 120px at 50% -20%, rgba(3,151,171,.35), transparent), ${p.bg}`
         : t.id === "claude"
@@ -59,7 +64,8 @@ function Preview({ t }: { t: DesktopTheme }) {
             t.id === "hextech" || t.id === "ocarina" ? "#a8892f" : t.id === "netrunner" ? "rgba(252,238,10,.35)" : t.id === "frost" ? "transparent" : p.line,
           borderTopColor: t.id === "frost" ? "rgba(230,226,215,.5)" : undefined,
           borderBottomColor: t.id === "frost" ? "rgba(230,226,215,.5)" : undefined,
-          backdropFilter: t.id === "vice" ? "blur(6px)" : undefined,
+          backdropFilter: t.id === "vice" || t.id === "sunshine" ? "blur(6px)" : undefined,
+          borderTop: t.id === "sunshine" ? "2px solid #ff8a3d" : undefined,
           boxShadow: t.id === "vice" ? "0 0 22px -8px #ff3f9f" : undefined,
         }}
       >
@@ -77,11 +83,11 @@ function Preview({ t }: { t: DesktopTheme }) {
           <span
             style={{
               fontFamily: f.title,
-              fontSize: t.id === "vice" ? 17 : t.id === "tactical" ? 19 : t.id === "ocarina" ? 16 : 13,
+              fontSize: t.id === "vice" ? 17 : t.id === "tactical" || t.id === "sunshine" ? 19 : t.id === "ocarina" ? 16 : 13,
               letterSpacing: t.id === "frost" ? "0.3em" : f.upper ? "0.14em" : "0.02em",
               textTransform: f.upper ? "uppercase" : "none",
               color:
-                t.id === "netrunner" || t.id === "ocarina" ? p.amber : t.id === "hextech" ? "#c8aa6e" : t.id === "vice" ? "#ff6fb5" : p.text,
+                t.id === "netrunner" || t.id === "ocarina" ? p.amber : t.id === "sunshine" ? "#ffa63d" : t.id === "hextech" ? "#c8aa6e" : t.id === "vice" ? "#ff6fb5" : p.text,
               textShadow: t.id === "vice" ? "0 0 10px #ff3f9f" : t.id === "netrunner" ? "2px 0 rgba(255,42,109,.7), -2px 0 rgba(0,240,255,.5)" : undefined,
               fontWeight: t.id === "hextech" || t.id === "netrunner" ? 700 : t.id === "frost" ? 300 : 400,
             }}
@@ -102,7 +108,7 @@ function Preview({ t }: { t: DesktopTheme }) {
                 height: [18, 28, 12, 34, 22, 16][i],
                 background: c,
                 boxShadow: t.id === "claude" ? undefined : `0 0 6px ${c}88`,
-                borderRadius: t.id === "vice" || t.id === "claude" ? 4 : 0,
+                borderRadius: t.id === "vice" || t.id === "claude" ? 4 : t.id === "sunshine" ? 2 : 0,
               }}
             />
           ))}

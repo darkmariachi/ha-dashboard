@@ -1,0 +1,148 @@
+/*
+ * Sunshine State (see themes.css for the hooks): an original take on the
+ * modern Miami-sunset crime-drama look. Dusk sky from indigo to magenta to
+ * tangerine, a hazy low sun, palm and mid-rise silhouettes along the
+ * bottom, heavy condensed display type with a sunset fill, and dark plum
+ * glass panels kept opaque enough for the numbers to read.
+ */
+
+.dx[data-dx-theme="sunshine"] {
+  --font-dx: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-dx-title: "Anton", "Bebas Neue", Impact, sans-serif;
+  --font-mono: "Barlow Condensed", ui-sans-serif, sans-serif;
+  --dx-title-size: 14px;
+  --dx-title-track: 0.07em;
+  --sun: linear-gradient(90deg, #ffcf5c, #ff8a3d 35%, #ff3d7f 70%, #c13bff);
+  background:
+    radial-gradient(1100px 380px at 50% 100%, rgba(255, 138, 61, 0.55), transparent 70%),
+    radial-gradient(900px 500px at 85% 0%, rgba(46, 230, 214, 0.12), transparent 70%),
+    linear-gradient(180deg, #110c2e 0%, #2e0f4a 22%, #6b1660 45%, #b8235f 66%, #f0603f 84%, #ffb056 100%);
+}
+.dx[data-dx-theme="sunshine"] .dx-num { font-weight: 600; letter-spacing: 0.01em; }
+
+/* The sun: a soft, hazy disc sitting on the horizon, with heat shimmer. */
+.dx[data-dx-theme="sunshine"] .dx-fx::before {
+  content: "";
+  position: absolute;
+  left: 62%;
+  bottom: 9%;
+  width: 380px;
+  height: 380px;
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #fff3c4 0%, #ffc35a 30%, #ff7a3d 58%, rgba(255, 61, 127, 0) 72%);
+  filter: blur(2px);
+  opacity: 0.85;
+  animation: dx-sun-haze 9s ease-in-out infinite alternate;
+}
+@keyframes dx-sun-haze {
+  from { opacity: 0.75; transform: translate(-50%, 50%) scale(1); }
+  to { opacity: 0.92; transform: translate(-50%, 50%) scale(1.04); }
+}
+/* Palms and a low skyline along the bottom edge. */
+.dx[data-dx-theme="sunshine"] .dx-fx::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36%;
+  background: url("./palms.svg") center bottom / cover no-repeat;
+  opacity: 0.95;
+}
+/* Wispy cloud bands across the upper sky. */
+.dx[data-dx-theme="sunshine"] .dx-fx {
+  background:
+    radial-gradient(600px 40px at 22% 28%, rgba(255, 140, 190, 0.18), transparent 70%),
+    radial-gradient(800px 50px at 70% 40%, rgba(255, 170, 120, 0.16), transparent 70%),
+    radial-gradient(500px 30px at 40% 52%, rgba(255, 110, 160, 0.14), transparent 70%);
+}
+
+.dx[data-dx-theme="sunshine"] .dx-panel {
+  position: relative;
+  border-radius: 10px;
+  border-color: rgba(255, 140, 170, 0.16);
+  background:
+    linear-gradient(165deg, rgba(255, 110, 90, 0.09), transparent 30%),
+    var(--color-dx-panel);
+  backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 18px 40px -22px rgba(10, 0, 20, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* The sunset hairline across the top of every panel. */
+.dx[data-dx-theme="sunshine"] .dx-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--sun);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.dx[data-dx-theme="sunshine"] .dx-panel-head { border-bottom-color: rgba(255, 140, 170, 0.12); }
+.dx[data-dx-theme="sunshine"] .dx-title {
+  font-weight: 400;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #ffd36b, #ff8a3d 45%, #ff4f8f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-top: 1px;
+}
+.dx[data-dx-theme="sunshine"] .dx-tick {
+  width: 5px !important;
+  height: 14px !important;
+  border-radius: 1px !important;
+  transform: skewX(-14deg);
+  background: linear-gradient(180deg, #ffcf5c, #ff3d7f) !important;
+  box-shadow: 0 0 10px rgba(255, 61, 127, 0.7) !important;
+}
+.dx[data-dx-theme="sunshine"] .dx-rail {
+  background: linear-gradient(180deg, rgba(11, 10, 36, 0.92), rgba(40, 10, 50, 0.9));
+  border-right-color: rgba(255, 140, 170, 0.16);
+}
+.dx[data-dx-theme="sunshine"] .dx-topbar {
+  background: linear-gradient(90deg, rgba(11, 10, 36, 0.8), rgba(29, 13, 61, 0.55));
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, #ff8a3d 20%, #ff3d7f 55%, #2ee6d6 85%, transparent) 1;
+}
+.dx[data-dx-theme="sunshine"] .dx-nav { border-radius: 8px; }
+.dx[data-dx-theme="sunshine"] .dx-nav.active {
+  background: linear-gradient(135deg, rgba(255, 138, 61, 0.22), rgba(255, 61, 127, 0.22));
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 150, 0.45), 0 0 16px -4px rgba(255, 61, 127, 0.7);
+}
+.dx[data-dx-theme="sunshine"] .dx-logo {
+  border-radius: 8px;
+  background: linear-gradient(160deg, #ffcf5c, #ff6a3d 45%, #ff2f8a 75%, #8a2be2);
+  box-shadow: 0 0 22px -3px rgba(255, 61, 127, 0.85);
+  color: #fff;
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  font-size: 22px;
+  text-shadow: 0 1px 0 rgba(60, 0, 40, 0.5);
+}
+.dx[data-dx-theme="sunshine"] .dx-kicker { color: rgba(46, 230, 214, 0.75); }
+.dx[data-dx-theme="sunshine"] .dx-h1 {
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  padding-top: 2px;
+  background: linear-gradient(180deg, #fff1c9 0%, #ffbf5a 35%, #ff5a7a 70%, #e6339b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 61, 127, 0.55)) drop-shadow(2px 2px 0 rgba(20, 4, 40, 0.9));
+}
+.dx[data-dx-theme="sunshine"] .dx-btn {
+  border-radius: 6px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.dx[data-dx-theme="sunshine"] .dx-btn:hover:not(:disabled) { box-shadow: 0 0 14px -3px rgba(255, 61, 127, 0.8); }
+.dx[data-dx-theme="sunshine"] .dx-seg { border-radius: 6px; }
+.dx[data-dx-theme="sunshine"] .dx-seg > button { border-radius: 5px; font-family: "Barlow Condensed", sans-serif; font-size: 12.5px; font-weight: 600; }

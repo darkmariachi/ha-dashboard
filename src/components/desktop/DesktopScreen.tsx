@@ -23,6 +23,8 @@ import "@fontsource-variable/josefin-sans";
 import "./themes.css";
 import "./themes-fantasy.css";
 import "./themes-claude.css";
+import "./themes-sunshine.css";
+import "@fontsource/anton";
 import "@fontsource-variable/source-serif-4";
 import "@fontsource-variable/dm-sans";
 import "@fontsource/caveat/600.css";
