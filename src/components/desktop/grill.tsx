@@ -48,8 +48,8 @@ function Nudge({
 export function GrillPanel({ delay = 0, className }: { delay?: number; className?: string }) {
   const g = useGrill({ pitColor: C.amber, targetColor: C.faint, probeColors: [C.pink, C.violet, C.cyan] });
   if (!g.visible) return null;
-  const { now, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, status, series, pitMin, pitMax, holdReady } = g;
-  const stateColor = stale ? C.red : powerOn ? C.amber : C.faint;
+  const { now, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, status, series, pitMin, pitMax, holdReady, margin, marginReady, overheat, overBy } = g;
+  const stateColor = stale || overheat ? C.red : powerOn ? C.amber : C.faint;
 
   return (
     <Panel
@@ -71,6 +71,12 @@ export function GrillPanel({ delay = 0, className }: { delay?: number; className
         </span>
       }
     >
+      {overheat && !stale && (
+        <div className="mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-[11.5px] font-semibold" style={{ borderColor: C.red, color: C.red, background: `${C.red}22` }}>
+          <Flame size={13} className="shrink-0" />
+          Running hot: {Math.round(overBy!)}° over target. Something may be burning.
+        </div>
+      )}
       {(stale || problem || lidOpen) && (
         <div className="mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-[11.5px] font-semibold" style={{ borderColor: `${C.red}66`, color: C.red, background: `${C.red}12` }}>
           <AlertTriangle size={13} className="shrink-0" />
@@ -84,7 +90,7 @@ export function GrillPanel({ delay = 0, className }: { delay?: number; className
           <div className="flex items-start gap-6">
             <div>
               <Label>Pit</Label>
-              <Big value={pit === undefined ? "—" : Math.round(pit)} unit="°F" color={C.amber} size={44} />
+              <Big value={pit === undefined ? "—" : Math.round(pit)} unit="°F" color={overheat ? C.red : C.amber} size={44} />
               {fan !== undefined && (
                 <div className="dx-num mt-1 flex items-center gap-1 text-[11px] text-dx-dim">
                   <Fan size={11} /> fan {Math.round(fan)}%
@@ -151,6 +157,14 @@ export function GrillPanel({ delay = 0, className }: { delay?: number; className
               <span className="text-[11.5px] text-dx-dim">Then hold pit at</span>
               <Nudge value={hold.value} pending={hold.pending} min={150} max={250} step={5} onChange={hold.nudge} color={C.text} />
             </div>
+            {marginReady && (
+              <div className="flex items-center justify-between gap-2 border-t border-dx-line pt-3">
+                <span className="text-[11.5px] text-dx-dim" title="Alarm when the pit runs this far over target for 3 minutes">
+                  Overheat alarm at +
+                </span>
+                <Nudge value={margin.value} pending={margin.pending} min={15} max={150} step={5} onChange={margin.nudge} color={C.red} />
+              </div>
+            )}
           </div>
         )}
       </div>

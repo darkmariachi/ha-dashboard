@@ -236,6 +236,8 @@ export function useGrill({ pitColor = ACCENT, targetColor = TARGET_COLOR, probeC
     callService("input_number", "set_value", { value: v }, { entity_id: id }).catch(() => {});
   const done = useNudgedValue(num(doneEnt?.state), setInput(GRILL.hold.doneTemp));
   const hold = useNudgedValue(num(holdEnt?.state), setInput(GRILL.hold.holdTemp));
+  const marginEnt = e(GRILL.hold.overheatMargin);
+  const margin = useNudgedValue(num(marginEnt?.state), setInput(GRILL.hold.overheatMargin));
 
   const probes = GRILL.probes
     .map((p, i) => ({ name: p.name, tempId: p.temp, color: probeColors[i], temp: num(e(p.temp)?.state), target: num(e(p.target)?.state) }))
@@ -271,8 +273,15 @@ export function useGrill({ pitColor = ACCENT, targetColor = TARGET_COLOR, probeC
   const pitMin = (targetEnt?.attributes.min as number | undefined) ?? 150;
   const pitMax = (targetEnt?.attributes.max as number | undefined) ?? 700;
   const holdReady = !!doneEnt && !!holdEnt;
+  // Same rule as the grill_overheat automation (which also waits 3 min).
+  const setTarget = num(targetEnt?.state);
+  const overBy = pit !== undefined && setTarget !== undefined ? pit - setTarget : undefined;
+  // A lowered target (auto hold) leaves the pit coasting down for a while:
+  // like the automation, don't call that overheating for 90 minutes.
+  const settled = !targetEnt || now.getTime() - Date.parse(targetEnt.last_changed) > 90 * 60_000;
+  const overheat = powerOn && !stale && settled && overBy !== undefined && num(marginEnt?.state) !== undefined && overBy > num(marginEnt?.state)!;
 
-  return { visible, now, e, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, atTemp, hottestProbe, status, series, pitMin, pitMax, holdReady, callService };
+  return { visible, now, e, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, atTemp, hottestProbe, status, series, pitMin, pitMax, holdReady, margin, marginReady: !!marginEnt, overheat, overBy, callService };
 }
 
 /**
@@ -283,7 +292,7 @@ export function useGrill({ pitColor = ACCENT, targetColor = TARGET_COLOR, probeC
  */
 export function GrillCard({ index = 0 }: { index?: number }) {
   const g = useGrill();
-  const { visible, now, e, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, hottestProbe, status, series, pitMin, pitMax, holdReady, callService } = g;
+  const { visible, now, e, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, hottestProbe, status, series, pitMin, pitMax, holdReady, margin, marginReady, overheat, overBy, callService } = g;
   if (!visible) return null;
 
   return (
@@ -307,6 +316,13 @@ export function GrillCard({ index = 0 }: { index?: number }) {
         )}
       </div>
 
+      {overheat && !stale && (
+        <div className="flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-white" style={{ background: "#c0392b" }}>
+          <Flame size={14} className="shrink-0" />
+          Running hot: {Math.round(overBy!)}° over target. Something may be burning.
+        </div>
+      )}
+
       {(stale || problem || lidOpen) && (
         <div className="flex items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold" style={{ background: "#fff1d6", color: "#8a5a00" }}>
           <AlertTriangle size={14} className="shrink-0" />
@@ -322,7 +338,7 @@ export function GrillCard({ index = 0 }: { index?: number }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-dim">Pit</div>
-          <div className="text-[52px] font-light leading-none tracking-[-2px] text-text tabular-nums" style={{ color: stale ? undefined : ACCENT }}>
+          <div className="text-[52px] font-light leading-none tracking-[-2px] text-text tabular-nums" style={{ color: stale ? undefined : overheat ? "#c0392b" : ACCENT }}>
             {pit === undefined ? "—" : Math.round(pit)}°
           </div>
           {fan !== undefined && (
@@ -411,6 +427,17 @@ export function GrillCard({ index = 0 }: { index?: number }) {
             <span>Then hold pit at</span>
             <Stepper value={hold.value} pending={hold.pending} min={150} max={250} step={5} onChange={hold.nudge} />
           </div>
+        </div>
+      )}
+
+      {/* Overheat alarm */}
+      {marginReady && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl p-3 text-xs text-text-dim" style={{ background: "var(--chip-off)" }}>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-text">Overheat alarm</div>
+            <div>When the pit is this far over target for 3 min</div>
+          </div>
+          <Stepper value={margin.value} pending={margin.pending} min={15} max={150} step={5} onChange={margin.nudge} />
         </div>
       )}
     </div>

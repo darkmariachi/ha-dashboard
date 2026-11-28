@@ -25,5 +25,7 @@ export const GRILL = {
     armed: "input_boolean.grill_auto_hold",
     doneTemp: "input_number.grill_done_temp",
     holdTemp: "input_number.grill_hold_temp",
+    /** Alarm when the pit runs this many °F over target (automation grill_overheat). */
+    overheatMargin: "input_number.grill_overheat_margin",
   },
 };
