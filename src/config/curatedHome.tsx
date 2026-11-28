@@ -195,26 +195,38 @@ export interface CuratedTv {
    * panel itself over HDMI-CEC. */
   remote: string;
   player: string;
+  /** Shorter label for the TV card's picker chips, which get tight with four TVs. */
+  chip?: string;
 }
 
 export const CURATED_TVS: CuratedTv[] = [
   {
     key: "living_room",
     name: "Living room TV",
+    chip: "Living room",
     remote: "remote.living_room_living_room_tv_os",
     player: "media_player.living_room_living_room_tv_os",
   },
   {
     key: "andy",
     name: "Andy's Shield",
+    chip: "Andy's",
     remote: "remote.andy_s_room",
     player: "media_player.andys_shield",
   },
   {
     key: "bedroom",
     name: "Bedroom Shield",
+    chip: "Bedroom",
     remote: "remote.bedroom_shield",
     player: "media_player.bedroom_shield",
+  },
+  {
+    key: "backyard",
+    name: "Backyard Shield",
+    chip: "Backyard",
+    remote: "remote.backyard_shield",
+    player: "media_player.backyard_shield",
   },
 ];
 
@@ -339,6 +351,10 @@ const CURATED_INDOOR_TVS: string[] = [
   CURATED_LIVING_ROOM_TV,
 ];
 
+/** Every TV the bulk "off" scenes turn off: the indoor ones plus the
+ * backyard Shield, which nobody wants left on overnight or while out. */
+const CURATED_TVS_OFF: string[] = [...CURATED_INDOOR_TVS, "media_player.backyard_shield"];
+
 /**
  * One-tap scenes shown on the Home screen's Quick Actions card. Each just
  * bulk turn_on/turn_off's a list of entities via the generic `homeassistant`
@@ -352,7 +368,7 @@ export const CURATED_QUICK_ACTIONS: QuickAction[] = [
     icon: DoorOpen,
     action: "turn_off",
     description:
-      "Turning off every indoor light, fan, and TV except the office Hue lights. Driveway and backyard stay as they are.",
+      "Turning off every indoor light, fan, and TV except the office Hue lights. Driveway and backyard lights stay as they are.",
     // Every indoor room's lights/fans — driveway and backyard (external:
     // true) are left alone, since you'd still want those on while out.
     entityIds: [
@@ -360,7 +376,7 @@ export const CURATED_QUICK_ACTIONS: QuickAction[] = [
       // Indoor rooms' Hue groups too, so "everything off" really is.
       ...CURATED_ROOMS.filter((r) => !r.external && r.lights).map((r) => r.lights!),
       ...ALL_OFF_EXTRA.map((e) => e.entityId),
-      ...CURATED_INDOOR_TVS,
+      ...CURATED_TVS_OFF,
     ].filter((id) => !ALL_OFF_KEEP.includes(id)),
   },
   {
@@ -381,7 +397,7 @@ export const CURATED_QUICK_ACTIONS: QuickAction[] = [
       ...toggleIdsOf("kitchen"),
       ...toggleIdsOf("living_room"),
       ...toggleIdsOf("dining_room"),
-      ...CURATED_INDOOR_TVS,
+      ...CURATED_TVS_OFF,
     ],
   },
 ];

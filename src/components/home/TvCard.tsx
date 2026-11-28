@@ -240,10 +240,10 @@ export function TvCard({ index = 0 }: { index?: number }) {
             <button
               key={t.key}
               onClick={() => setSelected(t.key)}
-              className="flex-1 rounded-full py-1.5 text-xs font-semibold transition-colors"
+              className="min-w-0 flex-1 truncate rounded-full px-1 py-1.5 text-xs font-semibold transition-colors"
               style={t.key === tv.key ? { background: ACCENT, color: "#fff" } : { color: "var(--color-text-dim)" }}
             >
-              {t.name}
+              {t.chip ?? t.name}
             </button>
           ))}
         </div>
