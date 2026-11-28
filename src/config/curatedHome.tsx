@@ -210,6 +210,12 @@ export const CURATED_TVS: CuratedTv[] = [
     remote: "remote.andy_s_room",
     player: "media_player.andys_shield",
   },
+  {
+    key: "bedroom",
+    name: "Bedroom Shield",
+    remote: "remote.bedroom_shield",
+    player: "media_player.bedroom_shield",
+  },
 ];
 
 /** App shortcuts on the TV remote, launched with remote.turn_on's
@@ -324,10 +330,14 @@ function toggleIdsOf(key: string): string[] {
 }
 
 /**
- * Indoor TVs — used by both "We're leaving" and "Good night". Still missing
- * the master bedroom TV as of 2026-08-26; add its entity_id here once known.
+ * Indoor TVs — used by both "We're leaving" and "Good night". The bedroom
+ * Shield's power reaches the Samsung panel over HDMI-CEC.
  */
-const CURATED_INDOOR_TVS: string[] = ["media_player.andys_shield", CURATED_LIVING_ROOM_TV];
+const CURATED_INDOOR_TVS: string[] = [
+  "media_player.andys_shield",
+  "media_player.bedroom_shield",
+  CURATED_LIVING_ROOM_TV,
+];
 
 /**
  * One-tap scenes shown on the Home screen's Quick Actions card. Each just
