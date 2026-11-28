@@ -166,6 +166,7 @@ function DevicesTab() {
     <>
       <PageTitle>Devices</PageTitle>
       <div className="flex flex-col gap-3">
+        <GrillCard />
         <YouTubeCard />
         {CURATED_COMPUTERS.map((c, i) => (
           <ComputerCard key={c.key} computer={c} index={i + 1} />
@@ -260,9 +261,6 @@ export function PhoneScreen() {
               <>
                 <PhoneHeader />
                 <StatusBar variant="phone" />
-                <div className="mt-4">
-                  <GrillCard />
-                </div>
               </>
             }
           />
