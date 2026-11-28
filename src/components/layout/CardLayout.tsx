@@ -43,7 +43,7 @@ function Slot({
   return (
     // A one-cell grid, so the card stretches to its row like it did before
     // it had a wrapper (side-by-side tiles stay the same height).
-    <div className={clsx("group/slot relative grid", item.className, empty && "hidden")}>
+    <div className={clsx("group/slot relative grid min-w-0 grid-cols-[minmax(0,1fr)]", item.className, empty && "hidden")}>
       {collapsed && (
         <button
           onClick={onToggle}
