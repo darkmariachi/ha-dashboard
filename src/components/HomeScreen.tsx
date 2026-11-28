@@ -3,6 +3,7 @@ import { CURATED_ROOMS, CURATED_WEATHER_ENTITY } from "../config/curatedHome";
 import { useHa } from "../ha/HaProvider";
 import { isNightFor } from "../lib/weatherTheme";
 import { CameraSidebar } from "./home/CameraSidebar";
+import { GrillCard } from "./home/GrillCard";
 import { ActivityFeed } from "./home/ActivityFeed";
 import { CameraWall } from "./home/CameraWall";
 import { HomeHero } from "./home/HomeHero";
@@ -49,6 +50,7 @@ export function HomeScreen() {
         <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
           <HomeHero />
           <StatusBar />
+          <GrillCard />
 
           {/* Rooms fill a 2-column grid on the left; the camera sidebar is
               a flex sibling on the right, which stretches to match the

@@ -23,6 +23,7 @@ import { QuickActionLink } from "./QuickActionLink";
 import { ThermostatAwayLink } from "./ThermostatAwayLink";
 import { AlarmLink } from "./AlarmLink";
 import { YouTubeCard } from "../devices/YouTubeCard";
+import { GrillCard } from "../home/GrillCard";
 import { RoomCard } from "../home/RoomCard";
 import { StatusBar } from "../home/StatusBar";
 import { SprinklersCard } from "../home/SprinklersCard";
@@ -259,6 +260,9 @@ export function PhoneScreen() {
               <>
                 <PhoneHeader />
                 <StatusBar variant="phone" />
+                <div className="mt-4">
+                  <GrillCard />
+                </div>
               </>
             }
           />
