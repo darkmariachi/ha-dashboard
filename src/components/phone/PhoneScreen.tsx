@@ -1,5 +1,5 @@
 import { Cctv, ChartColumn, Cpu, House, LayoutGrid, Users, type LucideIcon } from "lucide-react";
-import { createElement } from "react";
+import { createElement, useEffect } from "react";
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import clsx from "clsx";
 import {
@@ -34,6 +34,8 @@ import { useWeatherForecast } from "../home/useWeatherForecast";
 import { WeatherBackground } from "../home/WeatherBackground";
 import { WhoIsHome } from "../home/WhoIsHome";
 import { VisitorsPanel } from "../visitors/VisitorsPanel";
+import { CardLayout, EditLayoutButton } from "../layout/CardLayout";
+import { setEditingLayout } from "../../lib/layout";
 
 /** How often the phone's camera stills refresh (live stream on tap). */
 const CAMERA_SNAPSHOT_MS = 10_000;
@@ -110,11 +112,12 @@ function PhoneHeader() {
   );
 }
 
-function PageTitle({ children }: { children: React.ReactNode }) {
+function PageTitle({ children, editable = true }: { children: React.ReactNode; editable?: boolean }) {
   return (
-    <h1 className="rise hero-shadow mb-4 text-[28px] font-semibold tracking-[-0.5px] text-white">
-      {children}
-    </h1>
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h1 className="rise hero-shadow text-[28px] font-semibold tracking-[-0.5px] text-white">{children}</h1>
+      {editable && <EditLayoutButton />}
+    </div>
   );
 }
 
@@ -122,14 +125,20 @@ function RoomsTab() {
   return (
     <>
       <PageTitle>Rooms</PageTitle>
-      <div className="flex flex-col gap-3">
-        {CURATED_ROOMS.map((room, i) => (
-          <RoomCard key={room.key} room={room} index={i} />
-        ))}
-        <TvCard index={CURATED_ROOMS.length} />
-        <VacuumCard index={CURATED_ROOMS.length + 1} />
-        <SprinklersCard index={CURATED_ROOMS.length + 2} />
-      </div>
+      <CardLayout
+        layoutKey="phone.rooms"
+        className="flex flex-col gap-3"
+        items={[
+          ...CURATED_ROOMS.map((room, i) => ({
+            id: `room.${room.key}`,
+            label: room.name,
+            node: <RoomCard room={room} index={i} />,
+          })),
+          { id: "tv", label: "TV", node: <TvCard index={CURATED_ROOMS.length} /> },
+          { id: "vacuum", label: "Vacuum", node: <VacuumCard index={CURATED_ROOMS.length + 1} /> },
+          { id: "sprinklers", label: "Sprinklers", node: <SprinklersCard index={CURATED_ROOMS.length + 2} /> },
+        ]}
+      />
     </>
   );
 }
@@ -139,24 +148,38 @@ function CamerasTab() {
   return (
     <>
       <PageTitle>Cameras</PageTitle>
-      <div className="flex flex-col gap-3">
-        {CURATED_CAMERAS.map((cam, i) => (
-          <div key={cam.entityId} className="rise" style={{ animationDelay: `${100 + i * 50}ms` }}>
-            <CameraCard
-              ent={resolveCuratedCamera(entitiesWithArea, cam)}
-              bare
-              snapshotEveryMs={CAMERA_SNAPSHOT_MS}
-            />
-          </div>
-        ))}
-      </div>
+      <CardLayout
+        layoutKey="phone.cameras"
+        className="flex flex-col gap-3"
+        items={[
+          ...CURATED_CAMERAS.map((cam, i) => ({
+            id: cam.entityId,
+            label: cam.label,
+            node: (
+              <div className="rise" style={{ animationDelay: `${100 + i * 50}ms` }}>
+                <CameraCard
+                  ent={resolveCuratedCamera(entitiesWithArea, cam)}
+                  bare
+                  snapshotEveryMs={CAMERA_SNAPSHOT_MS}
+                />
+              </div>
+            ),
+          })),
+          {
+            id: "activity",
+            label: "Activity",
+            node: (
+              <div className="rise mt-3" style={{ animationDelay: `${100 + CURATED_CAMERAS.length * 50}ms` }}>
+                <h2 className="hero-shadow mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/85">Activity</h2>
+                <ActivityFeed />
+              </div>
+            ),
+          },
+        ]}
+      />
       <p className="hero-shadow mt-3 text-center text-xs text-white/75">
         Stills refresh every {CAMERA_SNAPSHOT_MS / 1000}s · tap a camera for live video
       </p>
-      <h2 className="hero-shadow mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/85">Activity</h2>
-      <div className="rise" style={{ animationDelay: `${100 + CURATED_CAMERAS.length * 50}ms` }}>
-        <ActivityFeed />
-      </div>
     </>
   );
 }
@@ -165,14 +188,20 @@ function DevicesTab() {
   return (
     <>
       <PageTitle>Devices</PageTitle>
-      <div className="flex flex-col gap-3">
-        <GrillCard />
-        <YouTubeCard />
-        {CURATED_COMPUTERS.map((c, i) => (
-          <ComputerCard key={c.key} computer={c} index={i + 1} />
-        ))}
-        <NotificationsCard index={CURATED_COMPUTERS.length + 1} />
-      </div>
+      <CardLayout
+        layoutKey="phone.devices"
+        className="flex flex-col gap-3"
+        items={[
+          { id: "grill", label: "Grill", node: <GrillCard /> },
+          { id: "youtube", label: "YouTube", node: <YouTubeCard /> },
+          ...CURATED_COMPUTERS.map((c, i) => ({
+            id: `computer.${c.key}`,
+            label: c.name,
+            node: <ComputerCard computer={c} index={i + 1} />,
+          })),
+          { id: "notifications", label: "Notifications", node: <NotificationsCard index={CURATED_COMPUTERS.length + 1} /> },
+        ]}
+      />
     </>
   );
 }
@@ -242,6 +271,11 @@ export function PhoneScreen() {
   const weather = entities[CURATED_WEATHER_ENTITY];
   const isNight = isNightFor(entities["sun.sun"]?.state);
 
+  // Rearranging is per tab: leaving the tab ends it.
+  useEffect(() => {
+    setEditingLayout(false);
+  }, [pathname]);
+
   return (
     <div className={clsx("relative h-full", isNight && "home-night")} data-sheet-root>
       <WeatherBackground condition={weather?.state} isNight={isNight} />
@@ -261,6 +295,9 @@ export function PhoneScreen() {
               <>
                 <PhoneHeader />
                 <StatusBar variant="phone" />
+                <div className="mt-4 flex justify-center">
+                  <EditLayoutButton />
+                </div>
               </>
             }
           />

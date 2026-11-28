@@ -1,3 +1,4 @@
+import { CardLayout } from "../layout/CardLayout";
 import {
   DoorClosed,
   DoorOpen,
@@ -373,15 +374,21 @@ export function StatusBar({ variant = "tablet" }: { variant?: "tablet" | "phone"
     >
       {variant === "phone" ? (
         // Phone: actions first (most-used one-handed), then the glanceable
-        // tiles side by side, then doors and music full width.
-        <>
-          <QuickActionsTile onRun={runAction} className="col-span-2 min-h-0" />
-          <OnNowTile className="col-span-2 min-h-0" onOpen={() => setOnNowOpen(true)} />
-          <PowerTile onOpen={() => setPowerOpen(true)} />
-          <ClimateTile onOpen={() => setClimateOpen(true)} />
-          <DoorsTile className="col-span-2 min-h-0" onOpen={() => setDoorsOpen(true)} />
-          <SpotifyTile onOpen={() => setSpotifyOpen(true)} className="col-span-2" />
-        </>
+        // tiles side by side, then doors and music full width — unless
+        // they've been rearranged (CardLayout).
+        <CardLayout
+          layoutKey="phone.home"
+          className="col-span-2 grid grid-cols-2 gap-3"
+          editClassName="col-span-2"
+          items={[
+            { id: "actions", label: "Quick actions", className: "col-span-2", node: <QuickActionsTile onRun={runAction} className="min-h-0" /> },
+            { id: "onnow", label: "On now", className: "col-span-2", node: <OnNowTile className="min-h-0" onOpen={() => setOnNowOpen(true)} /> },
+            { id: "power", label: "Power", node: <PowerTile onOpen={() => setPowerOpen(true)} /> },
+            { id: "climate", label: "Climate", node: <ClimateTile onOpen={() => setClimateOpen(true)} /> },
+            { id: "doors", label: "Doors", className: "col-span-2", node: <DoorsTile className="min-h-0" onOpen={() => setDoorsOpen(true)} /> },
+            { id: "music", label: "Music", className: "col-span-2", node: <SpotifyTile onOpen={() => setSpotifyOpen(true)} /> },
+          ]}
+        />
       ) : variant === "tv" ? (
         // TV: the four glanceable tiles in a row, actions and music below.
         <>

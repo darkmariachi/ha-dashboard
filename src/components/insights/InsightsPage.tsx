@@ -1,5 +1,7 @@
+import { CardLayout } from "../layout/CardLayout";
 import clsx from "clsx";
 import { CURATED_WEATHER_ENTITY } from "../../config/curatedHome";
+import { GAMING } from "../../config/gaming";
 import { useHa } from "../../ha/HaProvider";
 import { isNightFor } from "../../lib/weatherTheme";
 import { GamingCard } from "../devices/GamingCard";
@@ -11,12 +13,16 @@ import { PresenceInsightCard } from "./PresenceInsightCard";
 /** The Insights cards in one column — the phone's Insights tab. */
 export function InsightsColumn() {
   return (
-    <div className="flex flex-col gap-3">
-      <FaceScanCard />
-      <PresenceInsightCard index={1} />
-      <LightsInsightCard index={2} />
-      <GamingCard index={3} />
-    </div>
+    <CardLayout
+      layoutKey="phone.insights"
+      className="flex flex-col gap-3"
+      items={[
+        { id: "facescan", label: "Face scan", node: <FaceScanCard /> },
+        { id: "presence", label: "Who was home", node: <PresenceInsightCard index={1} /> },
+        { id: "lights", label: "Lights", node: <LightsInsightCard index={2} /> },
+        { id: "gaming", label: `${GAMING.kid}'s gaming`, node: <GamingCard index={3} /> },
+      ]}
+    />
   );
 }
 

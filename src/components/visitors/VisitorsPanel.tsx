@@ -1,3 +1,4 @@
+import { CardLayout } from "../layout/CardLayout";
 import clsx from "clsx";
 import { Bell, BellOff, Cctv, Loader2, Smartphone, Trash2, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -161,57 +162,83 @@ export function VisitorsPanel() {
 
   return (
     <>
-      <SectionTitle>Here now</SectionTitle>
-      {here.length === 0 ? (
-        <div className="glass rise rounded-[26px] px-5 py-4 text-sm text-text-dim" style={rise()}>
-          No visitors right now.
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {here.map(({ person: p, visits }) => (
-            <PersonRow key={p.id} person={p} avatar={avatars[p.id]?.sample} text={lastSeenText(visits, true, now)} here style={rise()} onOpen={() => setOpenPerson(p.id)} />
-          ))}
-        </div>
-      )}
-
-      {away.length > 0 && (
-        <>
-          <SectionTitle>Recently</SectionTitle>
-          <div className="flex flex-col gap-3">
-            {away.map(({ person: p, visits }) => (
-              <PersonRow key={p.id} person={p} avatar={avatars[p.id]?.sample} text={lastSeenText(visits, false, now)} here={false} style={rise()} onOpen={() => setOpenPerson(p.id)} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {newDevices.length > 0 && (
-        <>
-          <SectionTitle>New devices</SectionTitle>
-          <div className="glass rise flex flex-col rounded-[26px] p-2" style={rise()}>
-            {newDevices.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setNaming(d.id)}
-                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left active:bg-chip"
-              >
-                <Smartphone size={18} className="shrink-0" style={{ color: d.here ? HOME_GREEN : "var(--color-text-dim)" }} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-text">{d.name}</div>
-                  <div className="text-xs text-text-dim">
-                    {lastSeenText(d.visits, d.here, now)} · {d.visits.length} {d.visits.length === 1 ? "visit" : "visits"}
+      <CardLayout
+        layoutKey="visitors"
+        className="flex flex-col gap-6"
+        items={[
+          {
+            id: "here",
+            label: "Here now",
+            node: (
+              <div>
+                <SectionTitle>Here now</SectionTitle>
+                {here.length === 0 ? (
+                  <div className="glass rise rounded-[26px] px-5 py-4 text-sm text-text-dim" style={rise()}>
+                    No visitors right now.
                   </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {here.map(({ person: p, visits }) => (
+                      <PersonRow key={p.id} person={p} avatar={avatars[p.id]?.sample} text={lastSeenText(visits, true, now)} here style={rise()} onOpen={() => setOpenPerson(p.id)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          {
+            id: "recently",
+            label: "Recently",
+            node: away.length > 0 && (
+              <div>
+                <SectionTitle>Recently</SectionTitle>
+                <div className="flex flex-col gap-3">
+                  {away.map(({ person: p, visits }) => (
+                    <PersonRow key={p.id} person={p} avatar={avatars[p.id]?.sample} text={lastSeenText(visits, false, now)} here={false} style={rise()} onOpen={() => setOpenPerson(p.id)} />
+                  ))}
                 </div>
-                <UserPlus size={17} className="shrink-0 text-text-dim" />
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      <HouseholdSection title={(text) => <SectionTitle>{text}</SectionTitle>} />
-
-      <FaceReviewSection log={log} onChanged={refresh} title={(text) => <SectionTitle>{text}</SectionTitle>} />
+              </div>
+            ),
+          },
+          {
+            id: "new-devices",
+            label: "New devices",
+            node: newDevices.length > 0 && (
+              <div>
+                <SectionTitle>New devices</SectionTitle>
+                <div className="glass rise flex flex-col rounded-[26px] p-2" style={rise()}>
+                  {newDevices.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setNaming(d.id)}
+                      className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left active:bg-chip"
+                    >
+                      <Smartphone size={18} className="shrink-0" style={{ color: d.here ? HOME_GREEN : "var(--color-text-dim)" }} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-text">{d.name}</div>
+                        <div className="text-xs text-text-dim">
+                          {lastSeenText(d.visits, d.here, now)} · {d.visits.length} {d.visits.length === 1 ? "visit" : "visits"}
+                        </div>
+                      </div>
+                      <UserPlus size={17} className="shrink-0 text-text-dim" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: "household",
+            label: "Household",
+            node: <HouseholdSection title={(text) => <SectionTitle>{text}</SectionTitle>} />,
+          },
+          {
+            id: "faces",
+            label: "Faces to review",
+            node: <FaceReviewSection log={log} onChanged={refresh} title={(text) => <SectionTitle>{text}</SectionTitle>} />,
+          },
+        ]}
+      />
 
       {log.people.length === 0 && (
         <p className="hero-shadow mt-3 text-center text-xs text-white/75">

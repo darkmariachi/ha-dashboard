@@ -16,6 +16,8 @@
 //   POST /visitors/person { token, person: { id?, name, devices, notify } }
 //   POST /visitors/delete { token, id }
 //   POST /visitors/hide   { token, entityId, hidden }
+//   POST /layout/get      { token } -> { [key]: { order, collapsed } }
+//   POST /layout/set      { token, key, order?, collapsed? } (both empty = reset)
 //   GET  /health
 //
 // With HA_TOKEN set it also pushes alerts on its own: doors left open
@@ -47,6 +49,8 @@ const {
   DATA_FILE = "/data/subscriptions.json",
   // Visitors tab (visits.mjs). Uses HA_TOKEN too.
   VISITS_FILE = "/data/visitors.json",
+  // Card order and collapsed cards per tab, edited from the dashboard.
+  LAYOUT_FILE = "/data/layout.json",
   // Who gets "new device on the Wi-Fi" alerts (subscription `person`).
   NEW_DEVICE_PEOPLE = "rodolfo",
   // Door-open alerts (doors.mjs). Needs a long-lived HA access token.
@@ -82,6 +86,32 @@ async function save() {
   const tmp = `${DATA_FILE}.tmp`;
   await writeFile(tmp, JSON.stringify(subs, null, 2));
   await rename(tmp, DATA_FILE);
+}
+
+/** Card layouts, shared by every device: key (e.g. "phone.devices") ->
+ * { order: card ids, collapsed: card ids }. */
+let layouts = {};
+try {
+  layouts = JSON.parse(await readFile(LAYOUT_FILE, "utf8"));
+} catch {
+  layouts = {};
+}
+
+async function saveLayouts() {
+  const tmp = `${LAYOUT_FILE}.tmp`;
+  await writeFile(tmp, JSON.stringify(layouts, null, 2));
+  await rename(tmp, LAYOUT_FILE);
+}
+
+const LAYOUT_KEY = /^[a-z0-9.-]{1,40}$/;
+const LAYOUT_MAX_KEYS = 50;
+
+/** A list of card ids, or null if it isn't one. */
+function cardIds(v) {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v) || v.length > 100) return null;
+  if (!v.every((id) => typeof id === "string" && id.length > 0 && id.length <= 80)) return null;
+  return [...new Set(v)];
 }
 
 /** id -> { blob, expires }. Memory only: a pairing is over in seconds. */
@@ -289,6 +319,24 @@ const server = createServer(async (req, res) => {
       const sent = await deliver(targets, { title: title ?? "", message: message ?? "", url: url || "/phone", tag: tag || undefined, image: picture });
       log("sent", JSON.stringify(title), "to", sent, "of", targets.length);
       return reply(res, 200, { sent, targets: targets.length });
+    }
+
+    if (req.method === "POST" && (path === "/layout/get" || path === "/layout/set")) {
+      const { token, key, order, collapsed } = await body(req);
+      if (!(await validHaToken(token))) return reply(res, 401, { error: "invalid Home Assistant token" });
+      if (path === "/layout/get") return reply(res, 200, layouts);
+      if (typeof key !== "string" || !LAYOUT_KEY.test(key)) return reply(res, 400, { error: "bad key" });
+      const o = cardIds(order);
+      const c = cardIds(collapsed);
+      if (!o || !c) return reply(res, 400, { error: "bad card list" });
+      if (o.length === 0 && c.length === 0) delete layouts[key];
+      else {
+        if (!layouts[key] && Object.keys(layouts).length >= LAYOUT_MAX_KEYS) return reply(res, 429, { error: "too many layouts" });
+        layouts[key] = { order: o, collapsed: c };
+      }
+      await saveLayouts();
+      log("layout", key, o.length ? "ordered" : "default order", `${c.length} collapsed`);
+      return reply(res, 200, { ok: true, layout: layouts[key] ?? null });
     }
 
     if (req.method === "POST" && path.startsWith("/visitors/")) {
