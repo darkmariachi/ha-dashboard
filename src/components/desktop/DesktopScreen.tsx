@@ -71,6 +71,7 @@ import {
 import { Btn, C, Dot, Label } from "./ui";
 import { ThemePicker } from "./ThemePicker";
 import { CameraWall } from "./CameraWall";
+import { GrillPanel } from "./grill";
 import { themeVars, useDesktopTheme, type DesktopTheme } from "./themes";
 
 interface Page {
@@ -109,6 +110,7 @@ function Overview({ go }: { go: (k: string) => void }) {
   return (
     <>
       <KpiRow go={go} />
+      <GrillPanel delay={60} />
       <div className="grid gap-3 xl:grid-cols-12">
         <PowerPanel className="xl:col-span-7" height={196} delay={80} />
         <WeatherPanel className="xl:col-span-5" delay={120} />
@@ -151,6 +153,7 @@ function Rooms() {
         <VacuumPanel delay={240} />
         <SprinklerPanel delay={280} />
       </div>
+      <GrillPanel delay={320} />
     </>
   );
 }

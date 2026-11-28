@@ -28,7 +28,7 @@ function duration(ms: number) {
  * away and sends one service call once they stop tapping, so five quick
  * taps make one cloud write instead of five.
  */
-function useNudgedValue(current: number | undefined, send: (v: number) => void) {
+export function useNudgedValue(current: number | undefined, send: (v: number) => void) {
   const [pending, setPending] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -143,7 +143,19 @@ function useCookHistory(start: number | undefined, ids: string[]) {
   return data;
 }
 
-function CookChart({ series, start, end }: { series: Series[]; start: number; end: number }) {
+export function CookChart({
+  series,
+  start,
+  end,
+  labelClassName = "text-text-dim",
+  gridColor = "rgba(127,127,127,0.22)",
+}: {
+  series: Series[];
+  start: number;
+  end: number;
+  labelClassName?: string;
+  gridColor?: string;
+}) {
   const all = series.flatMap((s) => s.points.map((p) => p.v));
   if (all.length < 2 || end - start < 60_000) return null;
   const lo = Math.floor(Math.min(...all) / 25) * 25;
@@ -160,7 +172,7 @@ function CookChart({ series, start, end }: { series: Series[]; start: number; en
     <div className="relative">
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-36 w-full overflow-visible" aria-hidden>
         {grid.map((g) => (
-          <line key={g} x1={0} x2={w} y1={y(g)} y2={y(g)} stroke="rgba(127,127,127,0.22)" vectorEffect="non-scaling-stroke" />
+          <line key={g} x1={0} x2={w} y1={y(g)} y2={y(g)} stroke={gridColor} vectorEffect="non-scaling-stroke" />
         ))}
         {series.map((s) => {
           if (s.points.length === 0) return null;
@@ -189,7 +201,7 @@ function CookChart({ series, start, end }: { series: Series[]; start: number; en
       {grid.map((g) => (
         <span
           key={g}
-          className="pointer-events-none absolute left-0 -translate-y-1/2 text-[10px] tabular-nums text-text-dim"
+          className={clsx("pointer-events-none absolute left-0 -translate-y-1/2 text-[10px] tabular-nums", labelClassName)}
           style={{ top: `${(y(g) / h) * 100}%` }}
         >
           {g}°
@@ -199,13 +211,10 @@ function CookChart({ series, start, end }: { series: Series[]; start: number; en
   );
 }
 
-/**
- * The Kamado Joe during a cook: pit temperature against its target (with
- * +/- to change it), each plugged-in meat probe, a chart of the cook so far,
- * and the auto-hold that drops the pit to a holding temperature once the
- * meat is done — for overnight smokes. Hidden while the grill is off.
- */
-export function GrillCard({ index = 0 }: { index?: number }) {
+/** Everything a grill view needs: live state, nudgeable targets, the
+ * cook history, and a one-line status. Shared by the home/phone card and
+ * the desktop panel. */
+export function useGrill({ pitColor = ACCENT, targetColor = TARGET_COLOR, probeColors = PROBE_COLORS }: { pitColor?: string; targetColor?: string; probeColors?: string[] } = {}) {
   const { entities, callService } = useHa();
   const now = useNow(30_000);
 
@@ -229,13 +238,13 @@ export function GrillCard({ index = 0 }: { index?: number }) {
   const hold = useNudgedValue(num(holdEnt?.state), setInput(GRILL.hold.holdTemp));
 
   const probes = GRILL.probes
-    .map((p, i) => ({ name: p.name, tempId: p.temp, color: PROBE_COLORS[i], temp: num(e(p.temp)?.state), target: num(e(p.target)?.state) }))
+    .map((p, i) => ({ name: p.name, tempId: p.temp, color: probeColors[i], temp: num(e(p.temp)?.state), target: num(e(p.target)?.state) }))
     .filter((p) => p.temp !== undefined);
 
   const chartIds = [GRILL.grillTemp, GRILL.target, ...probes.map((p) => p.tempId)];
   const history = useCookHistory(powerOn ? cookStart : undefined, chartIds);
 
-  if (!targetEnt || (!powerOn && !stale && !armed)) return null;
+  const visible = !!targetEnt && (powerOn || stale || armed);
 
   const fan = num(e(GRILL.fan)?.state);
   const lidOpen = e(GRILL.lid)?.state === "off";
@@ -248,20 +257,34 @@ export function GrillCard({ index = 0 }: { index?: number }) {
     : !powerOn
       ? "Off"
       : atTemp
-        ? `Holding at ${Math.round(num(targetEnt.state) ?? 0)}°`
+        ? `Holding at ${Math.round(num(targetEnt?.state) ?? 0)}°`
         : pit !== undefined && target.value !== undefined && pit < target.value
           ? `Heating to ${Math.round(target.value)}°`
           : `Cooling to ${Math.round(target.value ?? 0)}°`;
 
   const series: Series[] = [
-    { id: GRILL.target, color: TARGET_COLOR, dashed: true, points: history[GRILL.target] ?? [] },
-    { id: GRILL.grillTemp, color: ACCENT, points: history[GRILL.grillTemp] ?? [] },
+    { id: GRILL.target, color: targetColor, dashed: true, points: history[GRILL.target] ?? [] },
+    { id: GRILL.grillTemp, color: pitColor, points: history[GRILL.grillTemp] ?? [] },
     ...probes.map((p) => ({ id: p.tempId, color: p.color, points: history[p.tempId] ?? [] })),
   ];
 
-  const pitMin = (targetEnt.attributes.min as number) ?? 150;
-  const pitMax = (targetEnt.attributes.max as number) ?? 700;
-  const holdReady = doneEnt && holdEnt;
+  const pitMin = (targetEnt?.attributes.min as number | undefined) ?? 150;
+  const pitMax = (targetEnt?.attributes.max as number | undefined) ?? 700;
+  const holdReady = !!doneEnt && !!holdEnt;
+
+  return { visible, now, e, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, atTemp, hottestProbe, status, series, pitMin, pitMax, holdReady, callService };
+}
+
+/**
+ * The Kamado Joe during a cook: pit temperature against its target (with
+ * +/- to change it), each plugged-in meat probe, a chart of the cook so far,
+ * and the auto-hold that drops the pit to a holding temperature once the
+ * meat is done — for overnight smokes. Hidden while the grill is off.
+ */
+export function GrillCard({ index = 0 }: { index?: number }) {
+  const g = useGrill();
+  const { visible, now, e, powerOn, stale, armed, cookStart, pit, target, done, hold, probes, fan, lidOpen, problem, hottestProbe, status, series, pitMin, pitMax, holdReady, callService } = g;
+  if (!visible) return null;
 
   return (
     <div
