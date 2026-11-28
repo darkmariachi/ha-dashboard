@@ -17,6 +17,8 @@ export const DESKTOP_WINDOWS: { entityId: string; label: string }[] = [
   { entityId: "binary_sensor.office_window_sensor", label: "Office window" },
   { entityId: "binary_sensor.dinning_room_window_sensor", label: "Dining room window" },
   { entityId: "binary_sensor.andys_window_sensor", label: "Andy's window" },
+  { entityId: "binary_sensor.closet_add_on_alarm_panel_konnected_zone_4", label: "Main bedroom window 1" },
+  { entityId: "binary_sensor.closet_add_on_alarm_panel_konnected_zone_5", label: "Main bedroom window 2" },
 ];
 
 /** UniFi Protect alarm manager. */

@@ -281,12 +281,11 @@ export interface CuratedDoorSensor {
 
 /**
  * Door/opening binary_sensors watched by DoorAlertMonitor — "on" = open.
- *
- * binary_sensor.back_door_sensor temporarily removed 2026-08-26 — reporting
- * buggy readings, pending a physical fix. Re-add once fixed.
  */
 export const CURATED_DOOR_SENSORS: CuratedDoorSensor[] = [
   { entityId: "binary_sensor.front_door_sensor", label: "Front Door" },
+  { entityId: "binary_sensor.back_door_sensor", label: "Back Door" },
+  { entityId: "binary_sensor.alarm_panel_59c746_zone_5", label: "Backyard East Door" },
   { entityId: "binary_sensor.garage_door_sensor", label: "Garage Door" },
   { entityId: "binary_sensor.print_room_garage_door", label: "Print Room Garage Door" },
 ];

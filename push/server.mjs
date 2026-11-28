@@ -55,7 +55,7 @@ const {
   NEW_DEVICE_PEOPLE = "rodolfo",
   // Door-open alerts (doors.mjs). Needs a long-lived HA access token.
   HA_TOKEN,
-  DOOR_SENSORS = "binary_sensor.front_door_sensor=Front Door,binary_sensor.garage_door_sensor=Garage Door,binary_sensor.print_room_garage_door=Print Room Garage Door",
+  DOOR_SENSORS = "binary_sensor.front_door_sensor=Front Door,binary_sensor.garage_door_sensor=Garage Door,binary_sensor.print_room_garage_door=Print Room Garage Door,binary_sensor.back_door_sensor=Back Door,binary_sensor.alarm_panel_59c746_zone_5=Backyard East Door",
   DOOR_ALERT_MINUTES = "2",
   DOOR_REPEAT_MINUTES = "10",
   // A sensor silent this long gets a "sensor is offline" alert; 0 = never.
