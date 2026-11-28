@@ -222,7 +222,7 @@ export function VisitorsPanel() {
       {log.hidden.length > 0 && (
         <div className="mt-4 text-center">
           <button onClick={() => setShowHidden((v) => !v)} className="hero-shadow text-xs font-semibold text-white/75">
-            {showHidden ? "Hide" : "Show"} {log.hidden.length} dismissed {log.hidden.length === 1 ? "device" : "devices"}
+            {showHidden ? "Hide" : "Show"} {log.hidden.length} ignored {log.hidden.length === 1 ? "device" : "devices"}
           </button>
           {showHidden && (
             <div className="glass mt-2 flex flex-col rounded-[26px] p-2 text-left">
@@ -233,7 +233,7 @@ export function VisitorsPanel() {
                     onClick={() => hideDevice(id, false).then(refresh)}
                     className="rounded-full bg-chip px-3 py-1 text-xs font-semibold text-text"
                   >
-                    Restore
+                    Un-ignore
                   </button>
                 </div>
               ))}
@@ -522,7 +522,7 @@ function NameDeviceSheet({
         disabled={busy}
         className="rounded-full py-2.5 text-sm font-semibold text-text-dim"
       >
-        Not a visitor — hide it
+        Not a visitor, ignore it
       </button>
     </Sheet>
   );

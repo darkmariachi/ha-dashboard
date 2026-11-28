@@ -513,6 +513,7 @@ export function VisitorsConsole() {
   const [selected, setSelected] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [ignoring, setIgnoring] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const linked = params.get("device");
 
@@ -525,6 +526,19 @@ export function VisitorsConsole() {
         })
         .catch((e: Error) => setError(e.message)),
     [],
+  );
+  /** Ignore (or un-ignore) a device: kept server-side in the visit log's
+   * hidden list, so it stays out of New devices everywhere. */
+  const ignore = useCallback(
+    (id: string, on: boolean) => {
+      setIgnoring(id);
+      setLog((l) => (l ? { ...l, hidden: on ? [...l.hidden, id] : l.hidden.filter((h) => h !== id) } : l));
+      return hideDevice(id, on)
+        .catch((e: Error) => setError(e.message))
+        .then(refresh)
+        .finally(() => setIgnoring(null));
+    },
+    [refresh],
   );
   useEffect(() => {
     refresh();
@@ -585,7 +599,7 @@ export function VisitorsConsole() {
     { label: "Visits · 30d", icon: CalendarDays, value: allMonth.length, color: C.pink },
     { label: "Time · 30d", icon: Clock, value: totalTime ? dur(totalTime) : "—", color: C.violet },
     { label: "New devices", icon: Smartphone, value: newDevices.length, unit: "to triage", color: newDevices.length ? C.amber : C.faint },
-    { label: "Dismissed", icon: EyeOff, value: log.hidden.length, color: C.faint },
+    { label: "Ignored", icon: EyeOff, value: log.hidden.length, color: C.faint },
   ];
 
   return (
@@ -721,6 +735,9 @@ export function VisitorsConsole() {
                             <Btn onClick={() => setAssigning(d.id)}>
                               <UserPlus size={11} /> Assign
                             </Btn>
+                            <Btn onClick={() => ignore(d.id, true)} disabled={ignoring === d.id} title="Not a visitor: hide it from New devices">
+                              <EyeOff size={11} /> Ignore
+                            </Btn>
                           </div>
                         </td>
                       </tr>
@@ -732,16 +749,26 @@ export function VisitorsConsole() {
             {log.hidden.length > 0 && (
               <div className="border-t border-dx-line px-4 py-2.5">
                 <button onClick={() => setShowHidden((v) => !v)} className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-dx-faint hover:text-dx-text">
-                  {showHidden ? "▾" : "▸"} {log.hidden.length} dismissed
+                  {showHidden ? "▾" : "▸"} {log.hidden.length} ignored
                 </button>
                 {showHidden && (
                   <div className="mt-2">
-                    {log.hidden.map((id) => (
-                      <div key={id} className="flex items-center gap-2 border-b border-dashed border-dx-line py-1.5 text-[12px] last:border-0">
-                        <span className="min-w-0 flex-1 truncate text-dx-dim">{log.names[id] ?? id}</span>
-                        <Btn onClick={() => hideDevice(id, false).then(refresh)}>Restore</Btn>
-                      </div>
-                    ))}
+                    {log.hidden.map((id) => {
+                      const net = netOf(id, log, entities);
+                      return (
+                        <div key={id} className="flex items-center gap-2 border-b border-dashed border-dx-line py-1.5 text-[12px] last:border-0">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-dx-dim">{log.names[id] ?? id}</div>
+                            {(net.oui || net.mac) && (
+                              <div className="dx-num truncate text-[10px] text-dx-faint">{[net.oui, net.mac].filter(Boolean).join(" · ")}</div>
+                            )}
+                          </div>
+                          <Btn onClick={() => ignore(id, false)} disabled={ignoring === id} title="Show it in New devices again">
+                            Un-ignore
+                          </Btn>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
